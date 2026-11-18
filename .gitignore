@@ -1,6 +1,5 @@
 node_modules
 .env
-dist
-server/uploads/*
+build
 server/uploads/*
 !server/uploads/.gitkeep
