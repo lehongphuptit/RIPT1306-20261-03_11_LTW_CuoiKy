@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import LoginPage from "./pages/LoginPage.jsx";
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 function Account() {
   const { user, loading, logout } = useAuth();
@@ -35,6 +36,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/account" replace />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/account" element={<Account />} />
           <Route
             path="*"
@@ -47,3 +49,4 @@ export default function App() {
     </BrowserRouter>
   );
 }
+

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Eye, EyeOff, MountainSnow } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { errorMessage } from '../../services/api.js';
 
 export default function LoginForm() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { state } = useLocation();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,6 +50,8 @@ export default function LoginForm() {
       <p className="mt-2 text-sm text-[#476363]">
         Khám phá thế giới, lưu giữ hành trình của bạn.
       </p>
+
+      {state?.registered && <p role="status" className="mt-3 text-sm font-semibold text-[#123b3b]">Tạo tài khoản thành công. Bạn có thể đăng nhập.</p>}
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
         <div>
@@ -118,6 +121,12 @@ export default function LoginForm() {
           {submitting ? 'Đang đăng nhập…' : 'Đăng nhập'}
         </button>
       </form>
+
+      <p className="mt-6 text-center text-sm text-[#254949]">
+        Chưa có tài khoản?{' '}
+        <Link to="/register" className="font-bold underline">Đăng ký</Link>
+      </p>
     </section>
   );
 }
+
