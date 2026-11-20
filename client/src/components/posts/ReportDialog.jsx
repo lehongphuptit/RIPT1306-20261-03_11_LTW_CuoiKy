@@ -90,9 +90,10 @@ export default function ReportDialog({ postId, isOpen, onClose }) {
 
             <div>
               <label className="block text-sm font-medium text-[#162424] dark:text-[#e8f0f0] mb-1">
-                Mô tả chi tiết (không bắt buộc)
+                {reason === 'other' ? 'Lý do báo cáo (bắt buộc)' : 'Mô tả chi tiết (không bắt buộc)'}
               </label>
               <textarea
+                required={reason === 'other'}
                 rows={3}
                 maxLength={500}
                 value={note}

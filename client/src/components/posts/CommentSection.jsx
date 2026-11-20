@@ -87,14 +87,15 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
   };
 
   const handleDelete = async (comment, parentId = null) => {
-    if (!window.confirm('Bạn có chắc muốn xoá bình luận này?')) return;
+    if (!await confirmAction('Bạn có chắc muốn xoá bình luận này?', 'Xóa bình luận')) return;
     try {
       await postService.deleteComment(comment._id);
+      notify("Đã xóa bình luận.");
       setComments(prev=>prev.filter(c=>c._id!==comment._id&&c.parent!==comment._id));
       const refreshed=await postService.getPostById(postId);
       onCountChange?.(0,refreshed.post.commentCount);
     } catch (err) {
-      alert(errorMessage(err));
+      notify(errorMessage(err),'error');
     }
   };
 
