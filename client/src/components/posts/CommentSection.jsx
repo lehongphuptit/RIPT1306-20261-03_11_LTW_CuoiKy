@@ -1,7 +1,8 @@
+import {confirmAction, notify} from '../../journal/Feedback.jsx';
 import CommentAvatar from '../../journal/CommentAvatar.jsx';
 import CommentOptions from '../../journal/CommentOptions.jsx';
 import {useLocation} from 'react-router-dom';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CornerDownRight, Send, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { errorMessage, postService } from '../../services/postService';
@@ -31,22 +32,31 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
 
   const canComment = currentUser && currentUser.role === 'member';
 
+  const pending=useRef(null);
+  const [loadingMore,setLoadingMore]=useState(false);
   const fetchComments = async (cursor = null, append = false) => {
+    if(pending.current)return;
+    const request=Symbol();
+    pending.current=request;
+    setLoadingMore(append);
     try {
       const data = await postService.getComments(postId, cursor);
+      if(pending.current!==request)return;
       const items = data.data;
-      setComments((prev) => (append ? [...prev, ...items] : items));
+      setComments((prev) => (append ? [...new Map([...prev,...items].map(item=>[item._id,item])).values()] : items));
       setNextCursor(data.nextCursor || null);
       setHasMore(Boolean(data.nextCursor));
     } catch (err) {
-      setError(errorMessage(err));
+      if(pending.current===request)setError(errorMessage(err));
     } finally {
-      setLoading(false);
+      if(pending.current===request){pending.current=null;setLoadingMore(false);setLoading(false);}
     }
   };
 
   useEffect(() => {
+    setLoading(true);setComments([]);setNextCursor(null);setHasMore(false);setError('');
     fetchComments();
+    return ()=>{pending.current=null;};
   }, [postId]);
 
   const handleSubmit = async (e) => {
@@ -65,7 +75,7 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
         ...(replyTo ? { parentId: replyTo.id } : {}),
       };
       const {comment}=await postService.createComment(postId,payload);
-      setComments(prev=>[{...comment,author:currentUser},...prev]);
+      setComments(prev=>[{...comment,author:currentUser},...prev.filter(item=>item._id!==comment._id)]);
       setContent('');
       setReplyTo(null);
       onCountChange?.(1);
@@ -233,7 +243,7 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
           {hasMore && (
             <button
               type="button"
-              onClick={() => fetchComments(nextCursor, true)}
+              disabled={loadingMore} onClick={() => fetchComments(nextCursor, true)}
               className="w-full py-2 rounded-full text-xs font-semibold bg-white/70 hover:bg-white text-[#1F3333]"
             >
               Tải thêm bình luận
