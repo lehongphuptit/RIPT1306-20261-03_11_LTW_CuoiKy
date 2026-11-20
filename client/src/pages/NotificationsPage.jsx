@@ -62,7 +62,7 @@ export default function NotificationsPage() {
     try {
       await userService.markNotificationRead(item._id);
       setNotifications(prev=>prev.map(n=>n._id===item._id?{...n,read:true}:n));
-    } catch(err){alert(errorMessage(err));}
+    } catch(err){notify(errorMessage(err),'error');}
   };
 
   const handleMarkAllRead = async () => {
@@ -70,7 +70,7 @@ export default function NotificationsPage() {
       await userService.markAllNotificationsRead();
       setNotifications(prev=>prev.map(n=>({...n,read:true})));
     } catch (err) {
-      alert(errorMessage(err));
+      notify(errorMessage(err),'error');
     }
   };
 
@@ -89,6 +89,7 @@ export default function NotificationsPage() {
   };
 
   const getTargetLink = (item) => {
+    if(item.type==='report_dismissed')return '/notifications';
     if (item.post) {
       return `/posts/${item.post?._id || item.post}`;
     }
