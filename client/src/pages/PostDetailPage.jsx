@@ -1,4 +1,6 @@
+import {confirmAction, notify} from '../journal/Feedback.jsx';
 import JournalImage from '../journal/JournalImage.jsx';
+import TaggedText from '../journal/TaggedText.jsx';
 import GuestPostActions from '../journal/GuestPostActions.jsx';
 import PostOptions from '../journal/PostOptions.jsx';
 import React, { useEffect, useState } from 'react';
@@ -10,7 +12,7 @@ import {
 
   Heart,
   MapPin,
-  Trash2,
+  EyeOff,
   Wallet,
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -18,6 +20,30 @@ import CommentSection from '../components/posts/CommentSection';
 import ReportDialog from '../components/posts/ReportDialog';
 import { useAuth } from '../context/AuthContext';
 import { errorMessage, postService } from '../services/postService';
+
+function AppealForm({post}){
+  const [reason,setReason]=useState('');
+  const [status,setStatus]=useState(post.appeal?.status);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  async function submit(e){
+    e.preventDefault();
+    if(busy || !reason.trim())return;
+    setBusy(true);setError('');
+    try{
+      await postService.appeal(post._id,reason.trim(),post.moderationCycle || post._id);
+      setStatus('pending');notify('Đã gửi khiếu nại.');
+    }catch(err){setError(errorMessage(err));}finally{setBusy(false);}
+  }
+  return <section className="moderation-appeal"><h2>Bài viết đang bị ẩn</h2>
+    {status?<p role="status">{status==='pending'?'Khiếu nại của bạn đang chờ quản trị viên xem xét.':'Quản trị viên đã xem xét và giữ nguyên quyết định ẩn bài.'}</p>:
+      <form onSubmit={submit}><label htmlFor="appeal-reason">Vì sao bạn đề nghị mở lại bài viết?</label>
+        <textarea id="appeal-reason" rows={3} maxLength={1500} required value={reason} onChange={e=>setReason(e.target.value)}/>
+        <button type="submit" className="primary" disabled={busy || !reason.trim()}>Gửi khiếu nại</button>
+        {error&&<p role="alert">{error}</p>}
+      </form>}
+  </section>;
+}
 
 export default function PostDetailPage() {
   const { id } = useParams();
@@ -78,15 +104,29 @@ export default function PostDetailPage() {
     }
   };
 
+  const [moderating,setModerating]=useState(false);
+  async function hidePost() {
+    const hidden=post.status==='hidden';
+    if(moderating || !await confirmAction(hidden?'Bỏ ẩn bài viết này?':'Ẩn bài viết này khỏi bảng tin?',hidden?'Bỏ ẩn':'Ẩn bài'))return;
+    setModerating(true);
+    try {
+      await postService.setStatus(post._id,hidden?'active':'hidden');
+      notify(hidden?"Đã bỏ ẩn bài viết.":"Đã ẩn bài viết khỏi bảng tin.");
+      setPost(prev=>prev?._id===post._id?{...prev,status:hidden?'active':'hidden'}:prev);
+    } catch(err) { notify(errorMessage(err),'error'); }
+    finally {setModerating(false);}
+  }
+
   const handleDeletePost = async () => {
-    if (!window.confirm('Bạn có chắc chắn muốn xoá bài viết này? Hành động không thể hoàn tác.')) {
+    if (!await confirmAction('Bạn có chắc chắn muốn xoá bài viết này? Hành động không thể hoàn tác.', 'Xóa bài')) {
       return;
     }
     try {
       await postService.deletePost(post._id);
+      notify("Đã xóa bài viết.");
       navigate('/');
     } catch (err) {
-      alert(errorMessage(err));
+      notify(errorMessage(err),'error');
     }
   };
 
@@ -102,7 +142,7 @@ export default function PostDetailPage() {
           Bài viết không tồn tại, đã bị ẩn hoặc chỉ hiển thị với người theo dõi tác giả.
         </p>
         <Link
-          to="/explore"
+          to="/"
           className="inline-block px-6 py-2.5 rounded-full bg-[#1F3333] text-white text-sm font-semibold"
         >
           Quay lại Khám phá
@@ -172,6 +212,7 @@ export default function PostDetailPage() {
         </div>)}
 
         <div className="detail-body">
+          {isOwner && post.status==="hidden" && <AppealForm key={post._id+(post.moderationCycle || "")} post={post}/>}
           <div className="space-y-4">
             <div className="flex items-center justify-between gap-2">
               <Link to={`/u/${post.author?.username}`} className="flex items-center gap-2.5">
@@ -181,10 +222,10 @@ export default function PostDetailPage() {
                   className="w-10 h-10 rounded-full object-cover border border-white"
                 />
                 <div>
-                  <div className="text-sm font-bold text-[#162424] dark:text-[#e8f0f0]">
+                  <div className="text-sm font-bold detail-text">
                     {post.author?.displayName || post.author?.username}
                   </div>
-                  <div className="text-xs text-[#4a6363] dark:text-[#9eb7b8]">
+                  <div className="text-xs detail-secondary">
                     @{post.author?.username} ·{' '}
                     {post.visibility === 'private' ? 'Riêng tư' : post.visibility === 'followers' ? 'Chỉ người theo dõi' : 'Công khai'}
                   </div>
@@ -193,8 +234,8 @@ export default function PostDetailPage() {
             </div>
 
             <div>
-              <h1 className="text-xl font-bold text-[#162424] dark:text-[#e8f0f0]">{post.title}</h1>
-              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-[#4a6363] dark:text-[#9eb7b8]">
+              <h1 className="text-xl font-bold detail-text">{post.title}</h1>
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-xs detail-secondary">
                 {post.location?.name && (
                   <span className="flex items-center gap-1 font-medium">
                     <MapPin className="w-3.5 h-3.5" /> {post.location.name}
@@ -207,15 +248,15 @@ export default function PostDetailPage() {
                   </span>
                 )}
                 {post.cost !== undefined && post.cost !== null && (
-                  <span className="flex items-center gap-1 font-semibold text-[#1F3333] dark:text-emerald-400">
+                  <span className="flex items-center gap-1 font-semibold detail-accent">
                     <Wallet className="w-3.5 h-3.5" /> {Number(post.cost).toLocaleString('vi-VN')}đ
                   </span>
                 )}
               </div>
             </div>
 
-            <p className="text-sm text-[#162424] dark:text-[#e8f0f0] whitespace-pre-line leading-relaxed">
-              {post.content}
+            <p className="text-sm detail-text whitespace-pre-line leading-relaxed">
+              <TaggedText text={post.content}/>
             </p>
 
             {post.hashtags?.length > 0 && (
@@ -224,7 +265,7 @@ export default function PostDetailPage() {
                   <Link
                     key={tag}
                     to={`/?q=${encodeURIComponent("#"+tag)}`}
-                    className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#1F3333]/10 text-[#1F3333] dark:text-[#e8f0f0] hover:bg-[#1F3333]/20"
+                    className="px-2.5 py-1 rounded-full text-xs font-medium bg-[#1F3333]/10 detail-text hover:bg-[#1F3333]/20"
                   >
                     #{tag}
                   </Link>
@@ -255,7 +296,7 @@ export default function PostDetailPage() {
               {isMember && <PostOptions id={post._id} saved={!!post.saved} onSaved={saved=>setPost(prev=>({...prev,saved}))} onEdit={isOwner?()=>navigate("/posts/"+post._id+"/edit"):undefined} onDelete={isOwner?handleDeletePost:undefined} onReport={isOwner?undefined:()=>setIsReportOpen(true)}/>}
             </div>
 
-            {isAdmin && <button type="button" onClick={handleDeletePost} title="Xoá bài"><Trash2/></button>}
+            {isAdmin && <button type="button" disabled={moderating} onClick={hidePost}><EyeOff size={16}/> {post.status==='hidden'?'Bỏ ẩn bài':'Ẩn bài'}</button>}
             <CommentSection
               postId={post._id}
               postAuthorId={post.author?._id}

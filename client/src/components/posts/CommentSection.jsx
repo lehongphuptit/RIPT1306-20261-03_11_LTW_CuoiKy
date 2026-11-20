@@ -110,12 +110,12 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
   if (!currentUser && !loading && comments.length===0 && !error) return null;
   return (
     <div id="comments" className="space-y-4">
-      <h3 className="text-base font-bold text-[#162424] dark:text-[#e8f0f0]">Bình luận</h3>
+      <h3 className="text-base font-bold detail-text">Bình luận</h3>
 
       {canComment ? (
         <form onSubmit={handleSubmit} className="space-y-2">
           {replyTo && (
-            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#1F3333]/10 text-xs text-[#162424] dark:text-[#e8f0f0]">
+            <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#1F3333]/10 text-xs detail-text">
               <span>
                 Đang trả lời <strong>{replyTo.authorName}</strong>
               </span>
@@ -136,7 +136,7 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder={replyTo ? 'Viết câu trả lời...' : 'Chia sẻ cảm nghĩ của bạn...'}
-              className="flex-1 rounded-full bg-white dark:bg-[#182828] px-4 py-2.5 text-sm border border-white/60 focus:outline-none focus:ring-2 focus:ring-[#1F3333]"
+              className="flex-1 rounded-full detail-input px-4 py-2.5 text-sm border border-white/60 focus:outline-none focus:ring-2 focus:ring-[#1F3333]"
             />
             <button
               aria-label="Gửi bình luận" type="submit"
@@ -154,26 +154,26 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
       {loading ? (
         <p className="text-sm text-[#4a6363]">Đang tải bình luận...</p>
       ) : comments.length === 0 ? (
-        <p className="text-sm text-[#4a6363] dark:text-[#9eb7b8]">Chưa có bình luận nào.</p>
+        <p className="text-sm detail-secondary">Chưa có bình luận nào.</p>
       ) : (
         <div className="space-y-4">
           {threads.map((comment) => (
             <div
               key={comment._id}
-              className="p-3.5 rounded-2xl bg-white/65 dark:bg-[#182828]/75 border border-white/50 space-y-2.5"
+              className="p-3.5 rounded-2xl detail-comment-surface border border-white/50 space-y-2.5"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="detail-comment-author"><CommentAvatar author={comment.author}/><Link
                     to={`/u/${comment.author?.username}`}
-                    className="text-sm font-bold text-[#162424] dark:text-[#e8f0f0] hover:underline"
+                    className="text-sm font-bold detail-text hover:underline"
                   >
                     {comment.author?.displayName || comment.author?.username}
                   </Link><CommentOptions comment={comment} onDelete={canDeleteComment(comment.author?._id)?()=>handleDelete(comment,null):undefined} user={currentUser} onEdited={content=>setComments(list=>list.map(item=>item._id===comment._id?{...item,content}:item))}/></div>
-                  <p className="text-sm text-[#162424] dark:text-[#e8f0f0] mt-0.5 whitespace-pre-line">
+                  <p className="text-sm detail-text mt-0.5 whitespace-pre-line">
                     {comment.content}
                   </p>
-                  <div className="flex items-center gap-3 mt-1.5 text-xs text-[#4a6363] dark:text-[#9eb7b8]">
+                  <div className="flex items-center gap-3 mt-1.5 text-xs detail-secondary">
                     <span>{new Date(comment.createdAt).toLocaleDateString('vi-VN')}</span>
 
                     {canComment && (
@@ -205,14 +205,14 @@ export default function CommentSection({ postId, postAuthorId, currentUser, onCo
                         <div>
                           <div className="detail-comment-author"><CommentAvatar author={reply.author}/><Link
                             to={`/u/${reply.author?.username}`}
-                            className="text-xs font-bold text-[#162424] dark:text-[#e8f0f0] hover:underline"
+                            className="text-xs font-bold detail-text hover:underline"
                           >
                             {reply.author?.displayName || reply.author?.username}
                           </Link><CommentOptions comment={reply} onDelete={canDeleteComment(reply.author?._id)?()=>handleDelete(reply,comment._id):undefined} user={currentUser} onEdited={content=>setComments(list=>list.map(item=>item._id===reply._id?{...item,content}:item))}/></div>
-                          <p className="text-sm text-[#162424] dark:text-[#e8f0f0] whitespace-pre-line">
+                          <p className="text-sm detail-text whitespace-pre-line">
                             {reply.content}
                           </p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-[#4a6363] dark:text-[#9eb7b8]">
+                          <div className="flex items-center gap-3 mt-1 text-xs detail-secondary">
                             <span>{new Date(reply.createdAt).toLocaleDateString('vi-VN')}</span>
 
                             {canComment && (

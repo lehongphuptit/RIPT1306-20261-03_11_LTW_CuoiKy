@@ -12,13 +12,13 @@ export function GuestPrompt({postId,action,onClose}) {
   </JournalDialog>;
 }
 
-export default function GuestPostActions({post}) {
+export default function GuestPostActions({post, showMenu=true}) {
   const [action, setAction] = useState('');
 
   return <>
     <button type="button" aria-label="Thích bài viết" onClick={()=>setAction('thả tim')}><Heart/> {post.likeCount || 0}</button>
     <button type="button" aria-label={'Bình luận ('+(post.commentCount || 0)+')'} onClick={()=>setAction('bình luận')}><MessageCircle/><span>{post.commentCount || 0} bình luận</span></button>
-    <PostOptions id={post._id} onGuestSave={()=>setAction('lưu')}/>
+    {showMenu&&<PostOptions id={post._id} onGuestSave={()=>setAction('lưu')}/>}
     {action && <GuestPrompt postId={post._id} action={action} onClose={()=>setAction('')}/>}
   </>;
 }

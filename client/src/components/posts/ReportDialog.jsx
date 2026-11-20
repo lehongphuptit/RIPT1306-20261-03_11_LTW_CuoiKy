@@ -115,8 +115,8 @@ export default function ReportDialog({ postId, isOpen, onClose }) {
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-6 py-2.5 rounded-full text-sm font-semibold bg-[#1F3333] hover:bg-[#142222] text-white disabled:opacity-50"
+                disabled={loading || (reason === 'other' && !note.trim())}
+                className="report-submit"
               >
                 {loading ? 'Đang gửi...' : 'Gửi báo cáo'}
               </button>

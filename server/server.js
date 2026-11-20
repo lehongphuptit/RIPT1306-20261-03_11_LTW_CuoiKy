@@ -1,7 +1,9 @@
 import "dotenv/config";
 import mongoose from "mongoose";
-import { connect, Post } from "./src/models.js";
+import { connect } from "./src/models.js";
 import { createApp } from "./src/app.js";
+import { Post } from "./src/models.js";
+import { Draft } from "./src/drafts.js";
 import { cleanupImages, protectNextBatch } from "./src/media.js";
 if (
   !process.env.MONGO_URI ||
@@ -26,6 +28,7 @@ try {
     try {
       await cleanupImages();
       await protectNextBatch(Post,{visibility:{$in:["private","followers"]}});
+      await protectNextBatch(Draft,{});
     } catch {
       console.error("Image cleanup retry pending");
     } finally {

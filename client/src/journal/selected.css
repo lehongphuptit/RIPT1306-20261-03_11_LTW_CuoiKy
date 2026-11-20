@@ -50,23 +50,6 @@
 @media(max-width:680px){.wv2 .comment{padding-right:0}.wv2 .top-welcome{display:none}.wv2 .nav a span{display:none}.wv2 .post-actions{gap:14px}.wv2 .post-actions .save-post{margin-left:auto}}
 @media(prefers-reduced-motion:reduce){.wv2 *,.wv2 *::before,.wv2 *::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
-/* Wanderly Vietnam Map */
-.wv2 .map-heading{max-width:1000px;margin:0 auto 24px}.wv2 .map-heading h1{margin:8px 0}.wv2 .map-layout{display:grid;grid-template-columns:minmax(235px,300px) minmax(0,1fr);gap:18px;max-width:1200px;margin:0 auto;align-items:stretch}.wv2 .map-list{background:var(--card,#fff);border:1px solid var(--line,#e5eae7);border-radius:16px;padding:18px;max-height:680px;overflow:auto}.wv2 .map-list label{display:block;font-size:13px;font-weight:700;margin-bottom:10px}.wv2 .map-list input{width:100%;padding:12px;border:1px solid var(--line,#e2e8e4);border-radius:10px;background:var(--card,#fff);color:var(--ink,#172b27);font:inherit;margin-bottom:12px}.wv2 .map-place{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:12px 8px;border-radius:10px;border:0;background:transparent;color:var(--ink,#17352e);cursor:pointer;transition:background .2s,transform .2s}.wv2 .map-place:hover{background:var(--soft,#edf5f1);transform:translateX(3px)}.wv2 .map-place[hidden]{display:none}.wv2 .map-place>span:nth-child(2){flex:1;min-width:0}.wv2 .map-place strong{display:block;font-size:13px}.wv2 .map-place small{display:block;color:var(--muted,#84908a);font-size:11px;line-height:1.5;margin-top:3px}.wv2 .map-place svg{width:18px;height:18px;flex-shrink:0}.wv2 .map-place-icon{width:32px;height:32px;display:grid;place-items:center;background:#e5f2eb;color:#247565;border-radius:50%}.wv2 .map-hint{font-size:11px;line-height:1.7;color:var(--muted,#78847f);margin-top:15px}.wv2 .map-panel{min-width:0;overflow:hidden;border-radius:16px;border:1px solid var(--line,#e5eae7);background:#e9f2ee}.wv2 .map-panel #vn-map{height:610px;width:100%;z-index:0}.wv2 .map-foot{padding:12px 16px;background:var(--card,#fff);font-size:11px;color:var(--muted,#77857e)}.wv2 .map-popup{font-family:'Be Vietnam Pro',sans-serif;min-width:175px}.wv2 .map-popup strong{font-size:15px;color:#155344}.wv2 .map-popup p{margin:6px 0;color:#65736d}.wv2 .map-popup small{display:block;margin-bottom:7px}.wv2 .map-post-link{display:block;color:#207968!important;padding:7px 0;text-decoration:none;border-top:1px solid #edf1ef;font-size:12px}.wv2 .map-no-post{font-size:11px;color:#8b958f}.wv2 .map-error{padding:25px}.wv2 .leaflet-container{font-family:'Be Vietnam Pro',sans-serif}@media(max-width:900px){.wv2 .map-layout{grid-template-columns:1fr}.wv2 .map-list{max-height:250px}.wv2 .map-panel #vn-map{height:480px}}@media(max-width:600px){.wv2 .map-panel #vn-map{height:420px}.wv2 .map-heading h1{font-size:28px}}
-
-/* Đánh dấu các quần đảo trên bản đồ Wanderly */
-.wv2 .map-hint{border-left:3px solid #d7a83b;padding-left:10px}
-
-/* Hoàng Sa / Trường Sa: independent labels above the base map tiles */
-.wv2 #vn-map .wanderly-island-label {
-  background:#fffdf4; color:#755013; border:1px solid #d8a128;
-  box-shadow:0 2px 8px rgba(44,58,40,.16); border-radius:8px;
-  padding:5px 9px; font-family:"Be Vietnam Pro",sans-serif;
-  font-size:12px; font-weight:700; white-space:nowrap;
-}
-.wv2 #vn-map .wanderly-island-label::before {border-top-color:#d8a128;}
-.wv2 #vn-map .leaflet-tooltip-pane {z-index:680;}
-.wv2 #vn-map .leaflet-marker-pane {z-index:610;}
-
 /* Wanderly: replace destination story circles with a compact editorial heading. */
 .wv2 .destination-strip{align-items:center;gap:24px;overflow:visible;padding-bottom:25px}
 .wv2 .journey-heading{flex:1;min-width:0;padding:3px 0 4px 22px;border-left:1px solid var(--line);animation:journey-reveal .5s ease both}
@@ -87,6 +70,7 @@
 .wv2 .mode-switch[aria-checked="true"] .mode-thumb { transform: translateX(var(--thumb-x,22px)); }
 
 @media (max-width:680px) {
+  .wv2 #topbar .top-actions > .primary { display: none; }
   .wv2 #topbar { padding-inline: 8px; gap: 6px; }
   .wv2 #topbar .mobile-logo { font-size: 21px; }
   .wv2 #topbar .top-actions { gap: 2px; }
@@ -105,7 +89,7 @@
   .wv2 .form-grid { grid-template-columns: minmax(0,1fr); }
   .wv2 .form-actions { flex-wrap: wrap; }
   .wv2 .modal-head button { min-width: 44px; min-height: 44px; }
-  .wv2 .map-layout, .wv2 .map-panel, .wv2 .timeline { min-width: 0; }
+  .wv2 .timeline { min-width: 0; }
 }
 
 .wv2 .post > .extras{order:5}.wv2 .extras button,.wv2 .extras select{margin:5px}.wv2 .sidebar-bottom .account{width:100%;text-align:left}.wv2 .post .content{white-space:pre-wrap}.wv2 .timeline form fieldset{display:grid;gap:8px}.wv2 .mode-switch input{accent-color:var(--green)}.wv2 .account-menu{position:relative}.wv2 .account-menu summary{cursor:pointer;list-style:none}.wv2 .account-menu[open]>div{position:absolute;right:0;top:100%;z-index:10;width:165px;background:var(--paper);border:1px solid var(--line);padding:10px;display:grid;border-radius:12px}
@@ -142,7 +126,7 @@
 @media(max-width:1050px){.wanderly-search-pill{min-width:auto;padding:10px}.wanderly-search-pill span{display:none}}
 @media(max-width:680px){.wanderly-search-panel{position:fixed;top:64px;right:10px;left:10px;width:auto;max-height:65vh}.wanderly-search-pill{padding:8px}}
 
-.wv2 .journal-note a{display:flex;gap:12px;align-items:center;margin-top:1rem;color:inherit}.wv2 .map-layout{color:var(--ink);--card:var(--paper)}.wv2 .wanderly-search-form input{width:0;border:0;background:transparent;outline:none;box-shadow:none}.wv2 .timeline main{padding:0}.wv2 .wanderly-search-form:focus-within{outline:1px solid var(--green)}
+.wv2 .journal-note a{display:flex;gap:12px;align-items:center;margin-top:1rem;color:inherit}.wv2 .wanderly-search-form input{width:0;border:0;background:transparent;outline:none;box-shadow:none}.wv2 .timeline main{padding:0}.wv2 .wanderly-search-form:focus-within{outline:1px solid var(--green)}
 
 .wv2 .journal-composer { background:var(--paper); color:var(--ink); }
 .wv2.dark dialog { color-scheme:dark; }
@@ -185,6 +169,14 @@
 .wv2 .detail-actions>button {display:inline-flex;align-items:center;gap:6px;min-height:44px;white-space:nowrap;color:var(--ink);font-size:13px;}
 .wv2 .detail-actions>button svg {width:19px;height:19px;}
 .wv2 .detail-body #comments input {min-width:0;}
+.wv2 .detail-card { --detail-secondary:#43534e; }
+.wv2.dark .detail-card { --detail-secondary:#c0cdc7; }
+.wv2 .detail-card .detail-text, .wv2 .detail-card .detail-input { color:var(--ink); }
+.wv2 .detail-card .detail-secondary { color:var(--detail-secondary); }
+.wv2 .detail-card .detail-accent, .wv2 .detail-card .journal-hashtag { color:var(--green); }
+.wv2 .detail-card .detail-input, .wv2 .detail-card .detail-comment-surface { background:var(--paper); }
+.wv2 .detail-card .detail-input::placeholder { color:var(--detail-secondary); opacity:1; }
+
 .wv2 .comment-options-form {display:grid;gap:16px;}
 .wv2 .comment-options-form label {display:grid;gap:6px;}
 .wv2 .comment-options-form blockquote {margin:0;padding:8px 12px;border-left:3px solid var(--line);overflow-wrap:anywhere;}
@@ -209,3 +201,12 @@
 .wv2 .discussion-entry .comment-tool-list,.wv2 .detail-comment-author .comment-tool-list {right:0;left:auto;top:100%;bottom:auto;}
 .wv2 #comments .flex.items-start>div:first-child,.wv2 #comments .detail-comment-author {flex:1;min-width:0;}
 .wv2 #comments .flex.gap-2:has(.detail-comment-author)>div {flex:1;min-width:0;}
+
+.wv2 .journal-hashtag { color: var(--accent, currentColor); text-decoration: underline; text-underline-offset: .15em; }
+.wv2 .report-note {display:grid;gap:.4rem;margin:.75rem 0}
+.wv2 .report-note textarea {width:100%;padding:.65rem;border:1px solid var(--line);border-radius:.6rem;color:inherit;background:var(--paper)}
+
+.wv2 .post-author-row { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.wv2 .post-author-row > .post-options { flex:0 0 44px; height:1em; }
+.wv2 .post-author-row .post-options > button { position:absolute; right:0; top:50%; transform:translateY(-50%); }
+.wv2 .post-author-row .post-options-panel { top:calc(50% + 24px); bottom:auto; }

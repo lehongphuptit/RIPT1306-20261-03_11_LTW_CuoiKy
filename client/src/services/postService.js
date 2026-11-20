@@ -22,6 +22,9 @@ export const postService = {
     return res.data;
   },
 
+  setStatus: (id,status) => api.patch('/admin/posts/'+id+'/status',{status}),
+  appeal: (id,reason,cycle) => api.post('/posts/'+id+'/appeal',{reason,cycle}),
+
   deletePost: async (id) => {
     const res = await api.delete(`/posts/${id}`);
     return res.data;

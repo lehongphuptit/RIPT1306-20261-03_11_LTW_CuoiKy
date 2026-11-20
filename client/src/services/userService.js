@@ -9,9 +9,9 @@ export const userService = {
     return res.data;
   },
 
-  getUserPosts: async (author, cursor = null) => {
+  getUserPosts: async (author, cursor = null, signal) => {
     const res = await api.get("/posts", {
-      params: { author, cursor },
+      params: { author, cursor }, signal,
     });
     return res.data;
   },

@@ -61,6 +61,7 @@ const post = new Schema(
       default: "public",
     },
     status: { type: String, enum: ["active", "hidden"], default: "active" },
+    moderationCycle: String,
     hashtags: [String],
     revision: { type: Number, default: 0 },
   },
@@ -98,9 +99,10 @@ follow.index({ follower: 1, following: 1 }, { unique: true });
 follow.index({ following: 1 });
 const notification = new Schema(
   {
+    message: String,
     recipient: ref("User", { required: true }),
     actor: ref("User", { required: true }),
-    type: { type: String, enum: ["like", "comment", "follow"] },
+    type: { type: String, enum: ["like", "comment", "follow", "post_hidden", "post_restored", "appeal_denied", "report_dismissed"] },
     post: ref("Post", { default: null }),
     comment: ref("Comment", { default: null }),
     read: { type: Boolean, default: false },
@@ -145,6 +147,15 @@ export async function removeCommentThread(id, session) {
   await Comment.deleteMany({_id:{$in:ids}}).session(session);
   await CommentReport.updateMany({comment:{$in:ids},status:"pending"},{$set:{status:"resolved",handledAt:new Date()}}).session(session);
 }
+const appeal = new Schema({
+  post: ref("Post",{required:true}), author: ref("User",{required:true}),
+  cycle: {type:String,required:true}, reason: {type:String,required:true,maxlength:1500},
+  status: {type:String,enum:["pending","approved","rejected"],default:"pending"},
+  handledAt: Date, handledBy: ref("User"),
+},opts);
+appeal.index({post:1,cycle:1},{unique:true});
+appeal.index({status:1,createdAt:-1,_id:-1});
+export const Appeal=mongoose.model("Appeal",appeal);
 const cleanup = new Schema(
   {
     publicId: { type: String, unique: true },
