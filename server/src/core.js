@@ -93,7 +93,7 @@ export function admin(req, res, next) {
   next();
 }
 export async function visibleFilter(u, session) {
-  if (u?.role === "admin") return {};
+  if (u?.role === "admin") return { visibility: { $ne: "private" } };
   const locked = await User.find({ locked: true })
     .select("_id")
     .session(session || null);

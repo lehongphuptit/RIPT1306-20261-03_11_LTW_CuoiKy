@@ -1,3 +1,4 @@
+import JournalImage from './JournalImage.jsx';
 import {useImagePreviews} from '../hooks/useImagePreviews.js';
 import {readImages,saveImages} from './draftImages.js';
 import JournalDialog from './JournalDialog.jsx';
@@ -142,8 +143,8 @@ export default function Composer({ onPosted, user, post, onCancel, initiallyOpen
       <label className="block">Địa điểm<input name="location" defaultValue={post?.location?.name} required maxLength={120} className={field} /></label>
       <label className="block">Ngày đi<input name="tripDate" defaultValue={post?.tripDate?.slice(0,10)} type="date" required className={field} /></label>
       <label className="block">Chi phí (đồng)<input name="cost" type="number" min="0" max="999999999999" defaultValue={post?.cost||0} required className={field} /></label>
-      <label className="block">Người xem<select name="visibility" defaultValue={post?.visibility||"public"} className={field}><option value="public">Công khai</option><option value="followers">Người theo dõi</option></select></label>
-      {post?.images?.map(i=><label key={i.publicId}><input type="checkbox" checked={keep.includes(i.publicId)} onChange={e=>{const ids=e.target.checked?[...keep,i.publicId]:keep.filter(id=>id!==i.publicId);setKeep(ids);saveText(ids);}}/> Giữ ảnh <img loading="lazy" width="90" src={i.url} alt={post.title}/></label>)}
+      <label className="block">Người xem<select name="visibility" defaultValue={post?.visibility||"public"} className={field}><option value="public">Công khai</option><option value="followers">Người theo dõi</option><option value="private">Riêng tư (chỉ mình tôi)</option></select></label>
+      {post?.images?.map(i=><label key={i.publicId}><input type="checkbox" checked={keep.includes(i.publicId)} onChange={e=>{const ids=e.target.checked?[...keep,i.publicId]:keep.filter(id=>id!==i.publicId);setKeep(ids);saveText(ids);}}/> Giữ ảnh <JournalImage loading="lazy" width="90" src={i.url} alt={post.title}/></label>)}
       <small>{draftStatus || 'Nội dung và ảnh được tự lưu nháp trên trình duyệt này.'}</small>
       <label className="block">Ảnh ({selectedFiles.length + keep.length}/6)<input className={field} type="file" name="images" onChange={chooseFiles} multiple accept="image/jpeg,image/png,image/webp" /></label>
       {previews.length > 0 && <ul className="composer-previews" aria-label="Ảnh đã chọn">

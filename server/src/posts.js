@@ -25,7 +25,7 @@ import {
   pagination,
   page,
 } from "./core.js";
-import { postUpload, uploadImages, enqueue } from "./media.js";
+import { postUpload, uploadImages, enqueue, imageLinks, sendImage, protectExisting } from "./media.js";
 export const posts = Router();
 const date = z
   .string()
@@ -57,8 +57,10 @@ const body = z.object({
   location,
   tripDate: date,
   cost: z.coerce.number().finite().min(0).max(999999999999),
-  visibility: z.enum(["public", "followers"]).default("public"),
+  visibility: z.enum(["public", "followers", "private"]),
 });
+const createBody = body.extend({ visibility: body.shape.visibility.default("public") });
+const updateBody = body.partial();
 function input(req, partial = false) {
   const raw = { ...req.body };
   for (const key of ["location", "keepImageIds"])
@@ -69,7 +71,7 @@ function input(req, partial = false) {
         fail(400, key + " phải là JSON");
       }
     }
-  const values = parse(partial ? body.partial() : body, raw);
+  const values = parse(partial ? updateBody : createBody, raw);
   if (values.location)
     values.location.nameKey = normalize(values.location.name);
   if (values.content !== undefined)
@@ -105,6 +107,7 @@ async function decorate(list, u) {
   return list.map((p) => ({
     ...p.toObject({transform: (_doc, value) => { delete value.savedBy; return value; }}),
     saved: !!u && (p.savedBy || []).some(id => same(id,u._id)),
+    images:imageLinks(p.images,"/posts/"+p._id+"/image"),
     likeCount: likes.find((l) => same(l._id, p._id))?.count || 0,
     commentCount: comments.find((l) => same(l._id, p._id))?.count || 0,
     liked: mine.some((l) => same(l.post, p._id)),
@@ -165,6 +168,10 @@ posts.get("/search/suggestions", async (req, res) => {
 });
 posts.get("/saved", member, (req,res)=>list(req,res));
 posts.get("/feed", member, (req, res) => list(req, res, true));
+posts.get("/posts/:id/image", async(req,res)=>{
+  const post=await getPost(req.params.id,req.user);
+  await sendImage(post.images,req,res);
+});
 posts.get("/posts/:id", async (req, res) => {
   const p = await getPost(req.params.id, req.user);
   const saved = req.user && await Post.exists({_id:p._id, savedBy:req.user._id});
@@ -173,19 +180,23 @@ posts.get("/posts/:id", async (req, res) => {
 });
 posts.post("/posts", member, postUpload, async (req, res) => {
   const { values } = input(req);
-  const images = await uploadImages(req.files);
+  const images = await uploadImages(req.files,true);
   try {
     const p = await Post.create({ ...values, images, author: req.user._id });
-    res.status(201).json({ post: p });
+    res.status(201).json({ post: {...p.toObject(),images:imageLinks(p.images,"/posts/"+p._id+"/image")} });
   } catch (e) {
     await enqueue(images);
     throw e;
   }
 });
 posts.patch("/posts/:id", member, postUpload, async (req, res) => {
-  own(await getPost(req.params.id, req.user), req.user);
+  const original=await getPost(req.params.id, req.user);
+  own(original,req.user);
   const { values, keep } = input(req, true);
-  const newImages = await uploadImages(req.files);
+  if ((values.visibility || original.visibility) !== "public") {
+    await protectExisting(Post,original._id,original.images.filter(i=>!keep || keep.includes(i.publicId)));
+  }
+  const newImages = await uploadImages(req.files,true);
   let updated;
   try {
     await transaction(async (session) => {
@@ -213,7 +224,7 @@ posts.patch("/posts/:id", member, postUpload, async (req, res) => {
     await enqueue(newImages);
     throw e;
   }
-  res.json({ post: updated });
+  res.json({ post: {...updated.toObject(),images:imageLinks(updated.images,"/posts/"+updated._id+"/image")} });
 });
 posts.delete("/posts/:id", member, async (req, res) => {
   await transaction(async (session) => {

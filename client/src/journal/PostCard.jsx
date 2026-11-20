@@ -1,3 +1,4 @@
+import JournalImage from './JournalImage.jsx';
 import CommentAvatar from './CommentAvatar.jsx';
 import CommentOptions from './CommentOptions.jsx';
 import GuestPostActions from './GuestPostActions.jsx';
@@ -34,8 +35,8 @@ export default function PostCard({post,user,refresh,onRemoved}){
  const [comments,setComments]=useState(false),[count,setCount]=useState(post.commentCount);
  const [report,setReport]=useState(false),[reason,setReason]=useState('spam'),[reported,setReported]=useState(false);
  const member=user?.role==='member',own=member&&user._id===post.author?._id,url='/posts/'+post._id;
- return <article className="post"><div className="post-head"><span className="avatar">{post.author?.displayName?.split(/\s+/).slice(0,2).map(n=>n[0]).join('')}</span><div className="byline"><Link to={profileUrl(post.author?._id)}>{post.author?.displayName}</Link><small>@{post.author?.username} · {post.visibility==='public'?'Công khai':'Chỉ người theo dõi'}</small></div></div>
- {post.images?.map(i=><div className="image-wrap" key={i.publicId||i.url}><Link to={url}><img className="post-cover" src={i.url} loading="lazy" alt={post.title}/></Link><span className="location-tag">{post.location?.name}</span></div>)}
+ return <article className="post"><div className="post-head"><span className="avatar">{post.author?.displayName?.split(/\s+/).slice(0,2).map(n=>n[0]).join('')}</span><div className="byline"><Link to={profileUrl(post.author?._id)}>{post.author?.displayName}</Link><small>@{post.author?.username} · {post.visibility==='public'?'Công khai':post.visibility==='private'?'Riêng tư':'Chỉ người theo dõi'}</small></div></div>
+ {post.images?.map(i=><div className="image-wrap" key={i.publicId||i.url}><Link to={url}><JournalImage className="post-cover" src={i.url} loading="lazy" alt={post.title}/></Link><span className="location-tag">{post.location?.name}</span></div>)}
  <div className="post-body"><h3><Link to={url}>{post.title}</Link></h3><p className="content">{post.content}</p><div className="post-meta"><span><Calendar/>{new Date(post.tripDate).toLocaleDateString('vi-VN',{timeZone:'UTC'})}</span><span><Wallet/>{Number(post.cost).toLocaleString('vi-VN')} ₫</span><span>{post.location?.name}</span></div></div>
  <div className="post-actions">{!user?<GuestPostActions post={post}/>:<>{member?<Action aria-pressed={liked} aria-label="Thích bài viết" run={async()=>{const r=liked?await api.delete(url+'/like'):await api.put(url+'/like');setLiked(r.data.liked);setLikes(v=>v+(r.data.liked?1:-1));}}><Heart size={18} fill={liked?'currentColor':'none'}/> {likes}</Action>:<span className="guest-like"><Heart/> {likes}</span>}
  <button onClick={()=>setComments(!comments)} aria-label={'Bình luận ('+count+')'}><MessageCircle/> {count} bình luận</button>

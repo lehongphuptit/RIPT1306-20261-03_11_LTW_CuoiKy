@@ -89,11 +89,11 @@ management.get("/admin/reports", async (req, res) => {
     : "pending";
   res.json(
     page(
-      await (req.query.target === "comment" ? CommentReport : Report).find({ $and: [{ status }, filter] })
+      (await (req.query.target === "comment" ? CommentReport : Report).find({ $and: [{ status }, filter] })
         .populate("reporter", "username displayName")
-        .populate("post", "title status")
+        .populate({path:"post",select:"title status",match:{visibility:{$ne:"private"}}})
         .sort({ createdAt: -1, _id: -1 })
-        .limit(limit + 1),
+        .limit(limit + 1).lean()).map(r=>r.post ? r : {...r,originalContent:undefined,note:undefined}),
       limit,
     ),
   );
@@ -105,7 +105,8 @@ management.patch("/admin/comment-reports/:id",async(req,res)=>{
       {$set:{status:action==="remove"?"resolved":"rejected",handledBy:req.user._id,handledAt:new Date()}},{session,new:true});
     if(!report) fail(409,"Báo cáo đã được xử lý hoặc không tồn tại");
     if(action==="remove") {
-      await Post.updateOne({_id:report.post},{$inc:{revision:1}},{session});
+      const result=await Post.updateOne({_id:report.post,visibility:{$ne:"private"}},{$inc:{revision:1}},{session});
+      if(!result.matchedCount)fail(404,"Bài viết không còn hiển thị");
       await removeCommentThread(report.comment,session);
     }
   });
@@ -121,7 +122,7 @@ management.patch("/admin/reports/:id", async (req, res) => {
     if (!r) fail(404, "Không tìm thấy báo cáo");
     if (r.status !== "pending") fail(409, "Báo cáo đã được xử lý");
     const p = await Post.findOneAndUpdate(
-      { _id: r.post },
+      { _id: r.post, visibility: { $ne: "private" } },
       {
         $inc: { revision: 1 },
         ...(action === "hide" ? { $set: { status: "hidden" } } : {}),
@@ -129,8 +130,8 @@ management.patch("/admin/reports/:id", async (req, res) => {
       { session },
     );
     if (!p) fail(404, "Bài đã bị xóa");
-    await Report.updateOne(
-      { _id: r._id, status: "pending" },
+    await Report.updateMany(
+      { post: r.post, status: "pending" },
       {
         $set: {
           status: action === "hide" ? "resolved" : "rejected",
@@ -147,7 +148,7 @@ management.patch("/admin/posts/:id/status", async (req, res) => {
   const b = parse(z.object({ status: z.enum(["active", "hidden"]) }), req.body);
   await transaction(async (session) => {
     const p = await Post.findOneAndUpdate(
-      { _id: oid(req.params.id) },
+      { _id: oid(req.params.id), visibility: { $ne: "private" } },
       { $set: b, $inc: { revision: 1 } },
       { session },
     );
@@ -174,7 +175,7 @@ management.get("/admin/stats", async (req, res) => {
     Post.countDocuments(),
     Promise.all([Report,CommentReport].map(model=>model.countDocuments({status:"pending"}))).then(([posts,comments])=>posts+comments),
     Post.aggregate([
-      { $match: { status: "active", author: { $nin: locked } } },
+      { $match: { status: "active", visibility:{$ne:"private"}, author: { $nin: locked } } },
       {
         $group: {
           _id: {

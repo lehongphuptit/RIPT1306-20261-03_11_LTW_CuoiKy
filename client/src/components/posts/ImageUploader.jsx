@@ -1,3 +1,4 @@
+import JournalImage from '../../journal/JournalImage.jsx';
 import React, { useRef, useState } from 'react';
 import { ImagePlus, X } from 'lucide-react';
 import { useImagePreviews } from '../../hooks/useImagePreviews';
@@ -70,7 +71,7 @@ export default function ImageUploader({
             key={img.publicId}
             className="relative aspect-square rounded-2xl overflow-hidden border border-white/60 shadow-sm group"
           >
-            <img src={img.url} alt="Ảnh đã đăng" className="w-full h-full object-cover" />
+            <JournalImage src={img.url} alt="Ảnh đã đăng" className="w-full h-full object-cover" />
             <button
               type="button"
               onClick={() => onRemoveExisting(img.publicId)}

@@ -36,7 +36,7 @@ user.index(
   { unique: true, partialFilterExpression: { isOwner: true } },
 );
 const image = new Schema(
-  { url: String, publicId: String, width: Number, height: Number },
+  { url: String, publicId: String, protectedId: String, width: Number, height: Number },
   { _id: false },
 );
 const post = new Schema(
@@ -57,7 +57,7 @@ const post = new Schema(
     cost: Number,
     visibility: {
       type: String,
-      enum: ["public", "followers"],
+      enum: ["public", "followers", "private"],
       default: "public",
     },
     status: { type: String, enum: ["active", "hidden"], default: "active" },
@@ -148,6 +148,7 @@ export async function removeCommentThread(id, session) {
 const cleanup = new Schema(
   {
     publicId: { type: String, unique: true },
+    delivery: String,
     attempts: { type: Number, default: 0 },
   },
   opts,

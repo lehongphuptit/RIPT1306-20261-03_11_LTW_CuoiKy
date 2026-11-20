@@ -1,3 +1,4 @@
+import JournalImage from '../journal/JournalImage.jsx';
 import GuestPostActions from '../journal/GuestPostActions.jsx';
 import PostOptions from '../journal/PostOptions.jsx';
 import React, { useEffect, useState } from 'react';
@@ -120,7 +121,7 @@ export default function PostDetailPage() {
       <div className="detail-card">
         {images.length > 0 && (<div className="detail-gallery">
               <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-black/10">
-                <img
+                <JournalImage
                   src={images[activeImageIdx]?.url}
                   alt={post.title}
                   className="w-full h-full object-cover"
@@ -163,7 +164,7 @@ export default function PostDetailPage() {
                         idx === activeImageIdx ? 'border-[#1F3333] scale-105' : 'border-transparent opacity-70'
                       }`}
                     >
-                      <img src={img.url} alt="" className="w-full h-full object-cover" />
+                      <JournalImage src={img.url} alt="" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>
@@ -185,7 +186,7 @@ export default function PostDetailPage() {
                   </div>
                   <div className="text-xs text-[#4a6363] dark:text-[#9eb7b8]">
                     @{post.author?.username} ·{' '}
-                    {post.visibility === 'followers' ? 'Chỉ người theo dõi' : 'Công khai'}
+                    {post.visibility === 'private' ? 'Riêng tư' : post.visibility === 'followers' ? 'Chỉ người theo dõi' : 'Công khai'}
                   </div>
                 </div>
               </Link>

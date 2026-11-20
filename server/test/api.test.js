@@ -129,6 +129,32 @@ test("Private post: guest/nonfollower 404, follow unlocks, unfollow revokes; no 
   assert.equal((await api("get", "/posts/" + id, b.token)).status, 404);
   assert.equal((await api("get", "/posts/" + id, owner.token)).status, 200);
 });
+test("Partial edit preserves visibility and kept images, and identifies invalid fields", async () => {
+  for (const visibility of ["private", "followers"]) {
+    const created = await api("post", "/posts", a.token).send({ ...payload, visibility });
+    assert.equal(created.status, 201);
+    const url = "/posts/" + created.body.post._id;
+    try {
+      const id = "travel-diary/test-image";
+      await Post.updateOne({ _id: created.body.post._id }, { $set: { images: [
+        { publicId: id, protectedId: id, url: "https://example.com/test-image.jpg" }
+      ] } });
+      const edited = await api("patch", url, a.token)
+        .field("title", "Tiêu đề đã sửa").field("keepImageIds", JSON.stringify([id]));
+      assert.equal(edited.status, 200);
+      assert.equal(edited.body.post.visibility, visibility);
+      assert.equal(edited.body.post.images[0].publicId, id);
+      assert.equal((await api("get", url)).status, 404);
+      assert.equal((await api("get", url + "/image?id=" + encodeURIComponent(id))).status, 404);
+      const invalid = await api("patch", url, a.token).send({ cost: -1 });
+      assert.equal(invalid.status, 400);
+      assert.ok(invalid.body.error.fields.some(issue => issue.field === "cost"));
+    } finally {
+      await api("delete", url, a.token);
+    }
+  }
+});
+
 test("Like uniqueness, comment root normalization, reports and hide/unhide, locked author", async () => {
   let r = await api("post", "/posts", a.token).send(payload);
   const id = r.body.post._id;
