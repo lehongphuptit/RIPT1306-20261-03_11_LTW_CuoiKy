@@ -5,7 +5,7 @@ import {
   User,
   Follow,
   Like,
-  Comment,
+  Comment, CommentReport, removeCommentThread,
   Report,
   Notification,
   transaction,
@@ -139,6 +139,30 @@ async function list(req, res, feed = false) {
   res.json(page(await decorate(items, req.user), limit));
 }
 posts.get("/posts", (req, res) => list(req, res));
+posts.get("/search/suggestions", async (req, res) => {
+  const term = String(req.query.q || "").trim().slice(0, 80);
+  const text = term.replace(/^[@#]/, "");
+  if (!text) return res.json({ users: [], places: [], tags: [] });
+  const escape = value => value.replace(/[.*+?^$\{}()|[\]\\]/g, "\\$&");
+  const name = new RegExp(escape(normalize(text)));
+  const tag = new RegExp(escape(text.toLowerCase()));
+  const visible = await visibleFilter(req.user);
+  const [users, locations, hashtags] = await Promise.all([
+    term.startsWith("#") ? [] : User.find({ role: "member", locked: false, searchKey: name })
+      .select(publicFields).sort({ username: 1 }).limit(4).lean(),
+    Post.aggregate([
+      { $match: { $and: [visible, { "location.nameKey": name }] } },
+      { $group: { _id: "$location.nameKey", name: { $min: "$location.name" } } },
+      { $sort: { _id: 1 } }, { $limit: 4 }
+    ]),
+    Post.aggregate([
+      { $match: { $and: [visible, { hashtags: tag }] } },
+      { $unwind: "$hashtags" }, { $match: { hashtags: tag } },
+      { $group: { _id: "$hashtags" } }, { $sort: { _id: 1 } }, { $limit: 3 }
+    ])
+  ]);
+  res.json({ users, places: locations.map(item => item.name), tags: hashtags.map(item => item._id) });
+});
 posts.get("/saved", member, (req,res)=>list(req,res));
 posts.get("/feed", member, (req, res) => list(req, res, true));
 posts.get("/posts/:id", async (req, res) => {
@@ -196,7 +220,7 @@ posts.delete("/posts/:id", member, async (req, res) => {
     const p = await getPost(req.params.id, req.user, session, true);
     own(p, req.user);
     await enqueue(p.images, session);
-    for (const model of [Like, Comment, Notification, Report])
+    for (const model of [Like, Comment, Notification, Report, CommentReport])
       await model.deleteMany({ post: p._id }).session(session);
     await p.deleteOne({ session });
   });
@@ -286,6 +310,29 @@ posts.post("/posts/:id/comments", member, async (req, res) => {
   });
   res.status(201).json({ comment: result });
 });
+posts.patch("/comments/:id", member, async (req,res) => {
+  const {content}=parse(z.object({content:z.string().trim().min(1).max(1000)}),req.body);
+  await transaction(async session=>{
+    const c=await Comment.findById(oid(req.params.id)).session(session);
+    if(!c) fail(404,"Không tìm thấy bình luận");
+    await getPost(String(c.post),req.user,session,true);
+    if(!same(c.author,req.user._id)) fail(403,"Chỉ tác giả mới được sửa bình luận");
+    c.content=content;
+    await c.save({session});
+  });
+  res.json({content});
+});
+posts.post("/comments/:id/reports",member,async(req,res)=>{
+  const {reason}=parse(z.object({reason:z.enum(["spam","offensive","false_info","other"])}),req.body);
+  await transaction(async session=>{
+    const c=await Comment.findById(oid(req.params.id)).session(session);
+    if(!c) fail(404,"Không tìm thấy bình luận");
+    await getPost(String(c.post),req.user,session,true);
+    if(same(c.author,req.user._id)) fail(400,"Không thể báo cáo bình luận của chính mình");
+    await CommentReport.create([{post:c.post,comment:c._id,originalContent:c.content,reporter:req.user._id,reason}],{session});
+  });
+  res.status(201).json({message:"Đã gửi báo cáo"});
+});
 posts.delete("/comments/:id", member, async (req, res) => {
   await transaction(async (session) => {
     const c = await Comment.findById(oid(req.params.id)).session(session);
@@ -293,11 +340,7 @@ posts.delete("/comments/:id", member, async (req, res) => {
     const p = await getPost(String(c.post), req.user, session, true);
     if (!same(c.author, req.user._id) && !same(p.author, req.user._id))
       fail(403, "Không có quyền xóa bình luận");
-    const ids = await Comment.find({ $or: [{ _id: c._id }, { parent: c._id }] })
-      .session(session)
-      .distinct("_id");
-    await Notification.deleteMany({ comment: { $in: ids } }).session(session);
-    await Comment.deleteMany({ _id: { $in: ids } }).session(session);
+    await removeCommentThread(c._id, session);
   });
   res.status(204).end();
 });

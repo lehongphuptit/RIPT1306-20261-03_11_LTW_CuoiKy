@@ -133,6 +133,18 @@ const report = new Schema(
 );
 report.index({ post: 1, reporter: 1 }, { unique: true });
 report.index({ status: 1, createdAt: -1 });
+const commentReport = new Schema({
+  ...report.obj, comment: ref("Comment",{required:true}), originalContent: {type:String,required:true}
+},opts);
+commentReport.index({reporter:1,comment:1},{unique:true});
+export const CommentReport = mongoose.model("CommentReport",commentReport);
+
+export async function removeCommentThread(id, session) {
+  const ids = await Comment.find({$or:[{_id:id},{parent:id}]}).session(session).distinct("_id");
+  await Notification.deleteMany({comment:{$in:ids}}).session(session);
+  await Comment.deleteMany({_id:{$in:ids}}).session(session);
+  await CommentReport.updateMany({comment:{$in:ids},status:"pending"},{$set:{status:"resolved",handledAt:new Date()}}).session(session);
+}
 const cleanup = new Schema(
   {
     publicId: { type: String, unique: true },

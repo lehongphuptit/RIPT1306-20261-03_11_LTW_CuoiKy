@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
-import { User, Post, Report, transaction, normalize } from "./models.js";
+import { User, Post, Report, CommentReport, removeCommentThread, transaction, normalize } from "./models.js";
 import {
   admin,
   fail,
@@ -89,7 +89,7 @@ management.get("/admin/reports", async (req, res) => {
     : "pending";
   res.json(
     page(
-      await Report.find({ $and: [{ status }, filter] })
+      await (req.query.target === "comment" ? CommentReport : Report).find({ $and: [{ status }, filter] })
         .populate("reporter", "username displayName")
         .populate("post", "title status")
         .sort({ createdAt: -1, _id: -1 })
@@ -97,6 +97,19 @@ management.get("/admin/reports", async (req, res) => {
       limit,
     ),
   );
+});
+management.patch("/admin/comment-reports/:id",async(req,res)=>{
+  const {action}=parse(z.object({action:z.enum(["remove","dismiss"])}),req.body);
+  await transaction(async session=>{
+    const report=await CommentReport.findOneAndUpdate({_id:oid(req.params.id),status:"pending"},
+      {$set:{status:action==="remove"?"resolved":"rejected",handledBy:req.user._id,handledAt:new Date()}},{session,new:true});
+    if(!report) fail(409,"Báo cáo đã được xử lý hoặc không tồn tại");
+    if(action==="remove") {
+      await Post.updateOne({_id:report.post},{$inc:{revision:1}},{session});
+      await removeCommentThread(report.comment,session);
+    }
+  });
+  res.json({message:"Đã xử lý báo cáo bình luận"});
 });
 management.patch("/admin/reports/:id", async (req, res) => {
   const { action } = parse(
@@ -159,7 +172,7 @@ management.get("/admin/stats", async (req, res) => {
   const [users, posts, pendingReports, locations] = await Promise.all([
     User.countDocuments({ role: "member" }),
     Post.countDocuments(),
-    Report.countDocuments({ status: "pending" }),
+    Promise.all([Report,CommentReport].map(model=>model.countDocuments({status:"pending"}))).then(([posts,comments])=>posts+comments),
     Post.aggregate([
       { $match: { status: "active", author: { $nin: locked } } },
       {

@@ -126,6 +126,11 @@ accounts.get("/users", async (req, res) => {
     .limit(limit + 1);
   res.json(page(list, limit));
 });
+accounts.get("/users/by-username/:username", async (req,res) => {
+  const user = await User.findOne({username:req.params.username.toLowerCase(), role:"member", locked:false}).select("_id");
+  if(!user) fail(404,"Không tìm thấy thành viên");
+  res.json({id:user._id});
+});
 accounts.get("/users/:id", async (req, res) => {
   const u = await User.findOne({
     _id: oid(req.params.id),

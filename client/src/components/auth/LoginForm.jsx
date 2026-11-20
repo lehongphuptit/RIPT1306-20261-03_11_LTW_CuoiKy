@@ -31,7 +31,7 @@ export default function LoginForm() {
 
     try {
       await login(cleanEmail, password, remember);
-      navigate('/', { replace: true });
+      navigate(state?.postId ? '/posts/'+encodeURIComponent(state.postId)+(state.comment?'#write-comment':'') : '/', { replace: true });
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {
@@ -124,7 +124,7 @@ export default function LoginForm() {
 
       <p className="mt-6 text-center text-sm text-[#254949]">
         Chưa có tài khoản?{' '}
-        <Link to="/register" className="font-bold underline">Đăng ký</Link>
+        <Link to="/register" state={{postId:state?.postId,comment:state?.comment}} className="font-bold underline">Đăng ký</Link>
       </p>
     </section>
   );
