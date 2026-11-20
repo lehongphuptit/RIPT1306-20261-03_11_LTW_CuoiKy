@@ -103,7 +103,8 @@ async function decorate(list, u) {
     u ? Like.find({ post: { $in: ids }, user: u._id }) : [],
   ]);
   return list.map((p) => ({
-    ...p.toObject(),
+    ...p.toObject({transform: (_doc, value) => { delete value.savedBy; return value; }}),
+    saved: !!u && (p.savedBy || []).some(id => same(id,u._id)),
     likeCount: likes.find((l) => same(l._id, p._id))?.count || 0,
     commentCount: comments.find((l) => same(l._id, p._id))?.count || 0,
     liked: mine.some((l) => same(l.post, p._id)),
@@ -112,6 +113,7 @@ async function decorate(list, u) {
 async function list(req, res, feed = false) {
   const { limit, filter } = pagination(req);
   const filters = [await visibleFilter(req.user), filter];
+  if (req.path === "/saved") filters.push({savedBy:req.user._id});
   if (req.query.author) filters.push({ author: oid(req.query.author) });
   if (feed) {
     const followed = await Follow.find({ follower: req.user._id }).distinct(
@@ -130,18 +132,20 @@ async function list(req, res, feed = false) {
         : { "location.nameKey": { $regex: literal } },
     );
   }
-  const items = await Post.find({ $and: filters })
+  const items = await Post.find({ $and: filters }).select("+savedBy")
     .populate("author", publicFields)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1);
   res.json(page(await decorate(items, req.user), limit));
 }
 posts.get("/posts", (req, res) => list(req, res));
+posts.get("/saved", member, (req,res)=>list(req,res));
 posts.get("/feed", member, (req, res) => list(req, res, true));
 posts.get("/posts/:id", async (req, res) => {
   const p = await getPost(req.params.id, req.user);
+  const saved = req.user && await Post.exists({_id:p._id, savedBy:req.user._id});
   await p.populate("author", publicFields);
-  res.json({ post: (await decorate([p], req.user))[0] });
+  res.json({ post: { ...(await decorate([p], req.user))[0], saved: !!saved } });
 });
 posts.post("/posts", member, postUpload, async (req, res) => {
   const { values } = input(req);
@@ -222,17 +226,37 @@ posts.delete("/posts/:id/like", member, async (req, res) => {
   });
   res.json({ liked: false });
 });
+for (const [method, operator] of [["put", "$addToSet"], ["delete", "$pull"]]) {
+  posts[method]("/posts/:id/save",member,async(req,res)=>{
+    await transaction(async session=>{
+      const post=await getPost(req.params.id,req.user,session,true);
+      await Post.updateOne({_id:post._id},{[operator]:{savedBy:req.user._id}},{session});
+    });
+    res.json({saved:method==="put"});
+  });
+  posts[method]("/comments/:id/like",member,async(req,res)=>{
+    let count;
+    await transaction(async session=>{
+      const c=await Comment.findById(oid(req.params.id)).session(session);
+      if(!c||await User.exists({_id:c.author,locked:true}).session(session))fail(404,"Không tìm thấy bình luận");
+      await getPost(String(c.post),req.user,session,true);
+      const updated=await Comment.findByIdAndUpdate(c._id,{[operator]:{likedBy:req.user._id}},{session,new:true}).select("+likedBy");
+      count=updated.likedBy.length;
+    });
+    res.json({liked:method==="put",likeCount:count});
+  });
+}
 posts.get("/posts/:id/comments", async (req, res) => {
   const p = await getPost(req.params.id, req.user);
   const { limit, filter } = pagination(req);
   const locked = await User.find({ locked: true }).distinct("_id");
   const items = await Comment.find({
     $and: [{ post: p._id, author: { $nin: locked } }, filter],
-  })
+  }).select("+likedBy")
     .populate("author", publicFields)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1);
-  res.json(page(items, limit));
+  res.json(page(items.map(c=>{const value=c.toObject();delete value.likedBy;return {...value, likeCount:(c.likedBy||[]).length,liked:!!req.user&&(c.likedBy||[]).some(id=>same(id,req.user._id))};}), limit));
 });
 posts.post("/posts/:id/comments", member, async (req, res) => {
   const b = parse(

@@ -106,6 +106,7 @@ management.patch("/admin/reports/:id", async (req, res) => {
   await transaction(async (session) => {
     const r = await Report.findById(oid(req.params.id)).session(session);
     if (!r) fail(404, "Không tìm thấy báo cáo");
+    if (r.status !== "pending") fail(409, "Báo cáo đã được xử lý");
     const p = await Post.findOneAndUpdate(
       { _id: r.post },
       {
@@ -115,8 +116,8 @@ management.patch("/admin/reports/:id", async (req, res) => {
       { session },
     );
     if (!p) fail(404, "Bài đã bị xóa");
-    await Report.updateMany(
-      { post: r.post, status: "pending" },
+    await Report.updateOne(
+      { _id: r._id, status: "pending" },
       {
         $set: {
           status: action === "hide" ? "resolved" : "rejected",
@@ -127,7 +128,7 @@ management.patch("/admin/reports/:id", async (req, res) => {
       { session },
     );
   });
-  res.json({ message: "Đã xử lý các báo cáo đang chờ của bài" });
+  res.json({ message: "Đã xử lý báo cáo" });
 });
 management.patch("/admin/posts/:id/status", async (req, res) => {
   const b = parse(z.object({ status: z.enum(["active", "hidden"]) }), req.body);

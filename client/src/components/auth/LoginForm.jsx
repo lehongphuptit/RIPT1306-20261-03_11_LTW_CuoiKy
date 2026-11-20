@@ -31,7 +31,7 @@ export default function LoginForm() {
 
     try {
       await login(cleanEmail, password, remember);
-      navigate('/account', { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       setMessage(errorMessage(error));
     } finally {

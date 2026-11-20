@@ -1,0 +1,28 @@
+.journal{--paper:#fff;--bg:#f4f7f3;--ink:#183b32;--line:#d6e4dc;--muted:#4b6c61;--accent:#216b53;min-height:100dvh;display:grid;grid-template-columns:210px minmax(0,1fr);background:var(--bg);color:var(--ink);font-family:system-ui,sans-serif}
+.journal.night{color-scheme:dark;--paper:#192923;--bg:#102019;--ink:#ecf5ef;--line:#365145;--muted:#c1d9cb;--accent:#a1e0be}
+.journal aside{background:var(--paper);border-right:1px solid var(--line);padding:24px 16px}
+.journal .brand{font:bold italic 32px Georgia,serif;color:var(--accent)}
+.journal nav{display:grid;gap:5px;margin:24px 0}.journal nav a{border-radius:12px;padding:10px 12px}.journal nav a:hover,.journal .selected{background:var(--bg);font-weight:650}
+.journal main{min-width:0}.journal header,.journal .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.journal header{padding:12px clamp(12px,4vw,64px);background:var(--paper);border-bottom:1px solid var(--line)}
+.journal header form{display:flex;align-items:center;flex:1;max-width:540px;background:var(--bg);border:1px solid var(--line);border-radius:999px;padding:0 5px 0 16px}
+.journal header form:focus-within{border-color:var(--accent)}
+.journal header input[type=search]{border:0;background:transparent;outline:none;min-width:0;flex:1}
+.journal .theme{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.journal button{min-height:42px;padding:6px 12px;color:var(--accent);border-radius:18px;font-weight:600}.journal button:hover{background:var(--bg)}.journal button:disabled{opacity:.6}
+.journal button.bg-\[\#206f60\]{color:white;background:#206f60}
+.journal .stream{max-width:780px;margin:auto;padding:24px 20px 64px}.journal h1{font:bold clamp(25px,4vw,38px) Georgia,serif;margin:12px 0 22px}
+.journal h2{font-size:21px;font-weight:700;margin:10px 0}.journal h3{font-weight:700}
+.journal .journal-card,.journal form.rounded-2xl{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:clamp(14px,3vw,25px);margin:15px 0;overflow-wrap:anywhere}
+.journal .journal-card img{max-height:560px;max-width:100%;object-fit:contain;margin:10px auto}.journal .journal-card .portrait{width:72px;height:72px;border-radius:50%;object-fit:cover;margin:0}
+.journal .content,.journal .comment p,.journal .reply p{white-space:pre-wrap}.journal .meta,.journal small{font-size:14px;color:var(--muted)}
+.journal .actions button{display:inline-flex;align-items:center;gap:6px}.journal [aria-pressed=true]{color:#b64c65}
+.journal form label{display:block;margin-bottom:8px}.journal input:not([type=checkbox]),.journal textarea,.journal select{font-size:16px;color:var(--ink);background:var(--paper)}
+.journal .journal-card input,.journal .journal-card textarea,.journal select{padding:8px;border:1px solid var(--line);border-radius:10px;max-width:100%}
+.journal .journal-card label input,.journal .journal-card textarea{display:block;width:100%}.journal .comment,.journal .reply{margin-block:10px;border-left:2px solid var(--line);padding-left:10px}.journal .reply{margin-left:20px}
+.journal [role=alert]{color:#bc4646}.journal iframe{width:100%;height:380px;border:0;border-radius:14px;margin:12px 0}
+@media(max-width:720px){.journal{display:block}.journal aside{padding:10px 12px;border:0}.journal .brand{font-size:24px}.journal nav{display:flex;overflow-x:auto;gap:2px;margin:4px 0 0}.journal nav a{white-space:nowrap;padding:10px}.journal header{padding:8px;gap:5px}.journal header form{min-width:140px}.journal .stream{padding:10px 12px 48px}.journal button{min-height:44px}.journal .journal-card{margin:10px 0}}
+
+.journal .places{display:none}
+@media(min-width:1160px){.journal main{display:grid;grid-template-columns:minmax(0,1fr) 225px;grid-template-rows:auto 1fr;align-items:start}.journal header{grid-column:1/-1}.journal .stream{width:100%}.journal .places{display:grid;gap:10px;margin:26px 18px 0 0;border:1px solid var(--line);border-radius:16px;background:var(--paper);padding:16px}.journal .places img{border-radius:12px;width:100%}.journal .places h2{font-size:17px}}
+.journal .theme input{appearance:none;width:44px;height:26px;border-radius:20px;background:#64756d;cursor:pointer;position:relative}.journal .theme input:before{content:'';position:absolute;top:3px;left:3px;background:white;width:20px;height:20px;border-radius:50%;transition:transform .12s}.journal .theme input:checked{background:#257153}.journal .theme input:checked:before{transform:translateX(18px)}

@@ -41,6 +41,7 @@ const image = new Schema(
 );
 const post = new Schema(
   {
+    savedBy: { type: [ref("User")], select: false, index: true },
     author: ref("User", { required: true, index: true }),
     title: { type: String, required: true },
     content: { type: String, required: true },
@@ -70,6 +71,7 @@ post.index({ "location.nameKey": 1 });
 post.index({ hashtags: 1 });
 const comment = new Schema(
   {
+    likedBy: { type: [ref("User")], select: false },
     post: ref("Post", { required: true, index: true }),
     author: ref("User", { required: true }),
     parent: ref("Comment", { default: null, index: true }),
