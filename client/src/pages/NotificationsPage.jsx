@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import {notify} from '../journal/Feedback.jsx';
+import React, { useEffect, useRef, useState } from 'react';
 import { Bell, CheckCheck, Heart, MessageCircle, ShieldAlert, UserPlus } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -11,25 +12,42 @@ export default function NotificationsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const pending = useRef(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const fetchNotifications = async (cursor = null, append = false) => {
+    if (pending.current) return;
+    const request = Symbol();
+    pending.current = request;
+    setLoadingMore(append);
     try {
       const res = await userService.getNotifications(cursor);
-      const items = res.data;
-      setNotifications((prev) => (append ? [...prev, ...items] : items));
+      if (pending.current !== request) return;
+      setNotifications(prev => append
+        ? Array.from(new Map([...prev, ...res.data].map(item => [item._id, item])).values())
+        : res.data);
       setNextCursor(res.nextCursor || null);
       setHasMore(Boolean(res.nextCursor));
     } catch (err) {
-      console.error(err);
+      if (pending.current === request) notify(errorMessage(err), 'error');
     } finally {
-      setLoading(false);
+      if (pending.current === request) {
+        pending.current = null;
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
+  const userId = user?._id;
   useEffect(() => {
-    if (user) {
-      fetchNotifications();
-    }
-  }, [user]);
+    setNotifications([]);
+    setNextCursor(null);
+    setHasMore(false);
+    setLoading(true);
+    if (userId) fetchNotifications();
+    return () => { pending.current = null; };
+  }, [userId]);
 
   if (authLoading) {
     return <div className="max-w-2xl mx-auto py-12 text-center text-[#4a6363]">Đang kiểm tra phiên đăng nhập...</div>;
@@ -141,6 +159,7 @@ export default function NotificationsPage() {
             {hasMore && (
               <button
                 type="button"
+                disabled={loadingMore}
                 onClick={() => fetchNotifications(nextCursor, true)}
                 className="w-full py-2.5 rounded-full text-xs font-semibold bg-white/80 hover:bg-white text-[#1F3333]"
               >
