@@ -1,10 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
+import PostFormPage from './pages/PostFormPage.jsx';
+import PostDetailPage from './pages/PostDetailPage.jsx';
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
+
 function Account() {
   const { user, loading, logout } = useAuth();
-  if (loading) return <p>Đang kiểm tra phiên đăng nhập…</p>;
+  if (loading) return <p>Đang kiểm tra phiên đăng nhập...</p>;
   if (!user) return <Navigate to="/login" replace />;
   return (
     <main style={{ maxWidth: 650, margin: "60px auto", padding: 24 }}>
@@ -12,8 +15,7 @@ function Account() {
       <p>Đăng nhập thành công: {user.displayName}</p>
       <p>Vai trò từ server: {user.role}</p>
       <p>
-        Đây là trang kiểm tra kết nối. Nhóm thay bằng bảng tin hoặc trang quản
-        trị sau.
+        Đây là trang kiểm tra kết nối. Nhóm thay bằng bảng tin hoặc trang quản trị sau.
       </p>
       <button
         onClick={logout}
@@ -29,6 +31,7 @@ function Account() {
     </main>
   );
 }
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -38,10 +41,13 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/account" element={<Account />} />
+          <Route path="/posts/new" element={<PostFormPage />} />
+          <Route path="/posts/:id/edit" element={<PostFormPage />} />
+          <Route path="/posts/:id" element={<PostDetailPage />} />
           <Route
             path="*"
             element={
-              <main style={{ padding: 32 }}>404 — Không tìm thấy trang</main>
+              <main style={{ padding: 32 }}>404 - Không tìm thấy trang</main>
             }
           />
         </Routes>
@@ -49,4 +55,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
