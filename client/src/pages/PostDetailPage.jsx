@@ -47,8 +47,12 @@ function AppealForm({post}){
 
 export default function PostDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  return <PostDetail key={id+":"+(currentUser?._id || "guest")} id={id} currentUser={currentUser}/>;
+}
+
+function PostDetail({id,currentUser}) {
+  const navigate = useNavigate();
 
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);

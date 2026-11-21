@@ -155,6 +155,25 @@ test("Partial edit preserves visibility and kept images, and identifies invalid 
   }
 });
 
+test("Dismissing a post report closes the pending group and notifies each reporter", async () => {
+  const created = await api("post", "/posts", a.token).send(payload);
+  assert.equal(created.status, 201);
+  const id = created.body.post._id;
+  for (const user of [b,c]) {
+    const result = await api("post", "/posts/"+id+"/reports",user.token).send({reason:"spam"});
+    assert.equal(result.status,201);
+  }
+  const report = await Report.findOne({post:id});
+  const result = await api("patch","/admin/reports/"+report._id,owner.token).send({action:"dismiss"});
+  assert.equal(result.status,200);
+  assert.equal(await Report.countDocuments({post:id,status:"rejected"}),2);
+  for (const user of [b,c]) {
+    assert.ok(await Notification.exists({recipient:user.user._id,post:id,type:"report_dismissed",read:false}));
+  }
+  assert.equal((await api("get","/posts/"+id)).status,200);
+  await api("delete","/posts/"+id,a.token);
+});
+
 test("Like uniqueness, comment root normalization, reports and hide/unhide, locked author", async () => {
   let r = await api("post", "/posts", a.token).send(payload);
   const id = r.body.post._id;

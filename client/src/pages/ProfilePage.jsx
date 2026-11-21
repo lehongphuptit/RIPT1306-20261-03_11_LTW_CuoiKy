@@ -1,7 +1,7 @@
 import {notify} from '../journal/Feedback.jsx';
 import JournalImage from '../journal/JournalImage.jsx';
 import TaggedText from '../journal/TaggedText.jsx';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, Edit3, Heart, MapPin, MessageCircle, Settings, UserCheck, UserPlus } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -27,13 +27,13 @@ function Profile({username,currentUser}) {
 
   useEffect(() => {
     let active=true;
-    setLoading(true);
+    if (!revision) setLoading(true);
     setNotFound(false);
 
     (async () => {
       try {
         const res = await userService.getProfileByUsername(username);
-        const userData = {...res.user, followerCount:res.followers, followingCount:res.following, isFollowing:res.isFollowing};
+        const userData = {...res.user, followerCount:res.followers, postCount:res.posts, followingCount:res.following, isFollowing:res.isFollowing};
         if(!active)return;
         setProfile(userData);
 
@@ -45,24 +45,43 @@ function Profile({username,currentUser}) {
       }
     })();
     return ()=>{active=false;};
-  }, [username,currentUser?._id]);
+  }, [username,currentUser?._id,revision]);
 
+  const sentinel = useRef(null);
+  const [loadingPosts,setLoadingPosts] = useState(true);
   const profileId=profile?._id;
   useEffect(()=>{
     if(!profileId)return;
     const controller=new AbortController();
     setPostsError('');
-    (async()=>{
-      const list=[];
-      let cursor=null;
-      do {
-        const result=await userService.getUserPosts(profileId,cursor,controller.signal);
-        list.push(...result.data);
-        cursor=result.nextCursor;
-      } while(cursor && !controller.signal.aborted);
-      if(!controller.signal.aborted)setPosts(list);
-    })().catch(err=>{if(!controller.signal.aborted)setPostsError(errorMessage(err));});
-    return ()=>controller.abort();
+    let observer;
+    let pending = false;
+    async function load(cursor) {
+      if (pending || controller.signal.aborted) return;
+      pending = true;
+      setLoadingPosts(true);
+      try {
+        const page = await userService.getUserPosts(profileId,cursor,controller.signal);
+        if (controller.signal.aborted) return;
+        setPosts(previous => cursor ? [...previous,...page.data] : page.data);
+        observer?.disconnect();
+        if (page.nextCursor && sentinel.current) {
+          observer = new IntersectionObserver(([entry]) => {
+            if (entry.isIntersecting) load(page.nextCursor);
+          }, {rootMargin:'150px'});
+          observer.observe(sentinel.current);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) setPostsError(errorMessage(err));
+        observer?.disconnect();
+      } finally {
+        pending = false;
+        if (!controller.signal.aborted) setLoadingPosts(false);
+      }
+    }
+    setPosts([]);
+    load(null);
+    return () => { controller.abort(); observer?.disconnect(); };
   },[profileId,revision]);
 
   const handleToggleFollow = async () => {
@@ -143,7 +162,7 @@ function Profile({username,currentUser}) {
 
               <div className="flex items-center justify-center sm:justify-start gap-5 pt-2 text-sm">
                 <span>
-                  <strong className="text-[#162424] dark:text-white">{posts.length}</strong>{' '}
+                  <strong className="text-[#162424] dark:text-white">{profile.postCount}</strong>{' '}
                   <span className="text-[#4a6363] dark:text-[#9eb7b8]">bài viết</span>
                 </span>
                 <span>
@@ -215,7 +234,7 @@ function Profile({username,currentUser}) {
                 : 'bg-white/60 hover:bg-white text-[#4a6363]'
             }`}
           >
-            Nhật ký đã đăng ({posts.length})
+            Nhật ký đã đăng ({profile.postCount})
           </button>
           <button
             type="button"
@@ -232,7 +251,7 @@ function Profile({username,currentUser}) {
       </div>
 
       {activeTab === 'posts' ? (
-        postsError ? <p role="alert">{postsError} <button onClick={()=>setRevision(n=>n+1)}>Thử tải lại bài viết</button></p> : posts.length === 0 ? (
+        postsError ? <p role="alert">{postsError} <button onClick={()=>setRevision(n=>n+1)}>Thử tải lại bài viết</button></p> : loadingPosts && !posts.length ? <p>Đang tải bài viết…</p> : posts.length === 0 ? (
           <div className="rounded-3xl bg-white/70 p-10 text-center space-y-3">
             <p className="text-sm text-[#4a6363]">Chưa có nhật ký chuyến đi nào được đăng.</p>
             {isOwnProfile && (
@@ -323,6 +342,7 @@ function Profile({username,currentUser}) {
           ))}
         </div>
       )}
+      <div ref={sentinel} aria-hidden="true" />
     </div>
   );
 }
