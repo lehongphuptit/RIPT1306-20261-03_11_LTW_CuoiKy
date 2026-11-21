@@ -149,11 +149,12 @@ management.patch("/admin/reports/:id",async(req,res)=>{
       if(!p)fail(404,"Bài viết không còn hiển thị");
       await setPostStatus(p,"hidden",req.user._id,session);
     }else{
-      await decisionNotice(report.reporter,req.user._id,"report_dismissed",report.post,
+      const pending = await Report.find({post:report.post,status:"pending"}).select("_id reporter").session(session);
+      await Report.updateMany({_id:{$in:pending.map(item=>item._id)}},
+        {$set:{status:"rejected",handledBy:req.user._id,handledAt:new Date()}},{session});
+      for (const item of pending) await decisionNotice(item.reporter,req.user._id,"report_dismissed",report.post,
         "Quản trị viên đã xem báo cáo của bạn và quyết định không ẩn bài viết theo báo cáo này.",session);
     }
-    await Report.updateOne({_id:report._id,status:"pending"},{$set:{
-      status:action==="hide"?"resolved":"rejected",handledBy:req.user._id,handledAt:new Date()}},{session});
   });
   res.json({message:"Đã xử lý báo cáo"});
 });
