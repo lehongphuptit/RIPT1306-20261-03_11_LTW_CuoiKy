@@ -1,9 +1,10 @@
 import React from 'react';
-import { Globe, Users } from 'lucide-react';
+import { Globe, Users, Lock } from 'lucide-react';
 
 export default function VisibilityPicker({ value, onChange }) {
   const options = [
     { id: 'public', label: 'Công khai', desc: 'Mọi người đều xem được', icon: Globe },
+    { id: 'private', label: 'Riêng tư', desc: 'Chỉ mình bạn xem được', icon: Lock },
     { id: 'followers', label: 'Chỉ người theo dõi', desc: 'Chỉ người theo dõi bạn xem được', icon: Users },
   ];
 

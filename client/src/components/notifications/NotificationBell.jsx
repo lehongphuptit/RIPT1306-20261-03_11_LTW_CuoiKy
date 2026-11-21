@@ -18,15 +18,8 @@ export default function NotificationBell() {
 
     const fetchUnread = async () => {
       try {
-        const res = await userService.getNotifications();
-        if (!active) return;
-        if (typeof res.unreadCount === 'number') {
-          setUnreadCount(res.unreadCount);
-        } else {
-          const items = res.items || res.notifications || res || [];
-          const count = Array.isArray(items) ? items.filter((n) => !n.isRead).length : 0;
-          setUnreadCount(count);
-        }
+        const count = await userService.getUnreadCount();
+        if(active)setUnreadCount(count);
       } catch {
       }
     };

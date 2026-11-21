@@ -6,7 +6,7 @@ import {
   User,
   Post,
   Follow,
-  Notification,
+  Notification, Report, CommentReport, Appeal,
   transaction,
   normalize,
 } from "./models.js";
@@ -126,6 +126,11 @@ accounts.get("/users", async (req, res) => {
     .limit(limit + 1);
   res.json(page(list, limit));
 });
+accounts.get("/users/by-username/:username", async (req,res) => {
+  const user = await User.findOne({username:req.params.username.toLowerCase(), role:"member", locked:false}).select("_id");
+  if(!user) fail(404,"Không tìm thấy thành viên");
+  res.json({id:user._id});
+});
 accounts.get("/users/:id", async (req, res) => {
   const u = await User.findOne({
     _id: oid(req.params.id),
@@ -184,14 +189,14 @@ accounts.delete("/users/:id/follow", member, async (req, res) => {
   });
   res.json({ following: false });
 });
-accounts.get("/notifications/unread-count", required, async (req, res) =>
-  res.json({
-    count: await Notification.countDocuments({
-      recipient: req.user._id,
-      read: false,
-    }),
-  }),
-);
+accounts.get("/notifications/unread-count", required, async (req,res)=>{
+  const count=await Notification.countDocuments({recipient:req.user._id,read:false});
+  res.set("Cache-Control","private, no-store");
+  if(req.user.role!=="admin")return res.json({count});
+  const [post,comment,appeals]=await Promise.all([Report,CommentReport,Appeal].map(model=>
+    model.countDocuments({status:"pending"})));
+  res.json({count,queues:{post,comment,appeals}});
+});
 accounts.get("/notifications", required, async (req, res) => {
   const { limit, filter } = pagination(req);
   res.json(

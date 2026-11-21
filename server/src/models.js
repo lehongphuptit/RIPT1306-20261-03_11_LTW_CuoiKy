@@ -36,11 +36,12 @@ user.index(
   { unique: true, partialFilterExpression: { isOwner: true } },
 );
 const image = new Schema(
-  { url: String, publicId: String, width: Number, height: Number },
+  { url: String, publicId: String, protectedId: String, width: Number, height: Number },
   { _id: false },
 );
 const post = new Schema(
   {
+    savedBy: { type: [ref("User")], select: false, index: true },
     author: ref("User", { required: true, index: true }),
     title: { type: String, required: true },
     content: { type: String, required: true },
@@ -56,10 +57,11 @@ const post = new Schema(
     cost: Number,
     visibility: {
       type: String,
-      enum: ["public", "followers"],
+      enum: ["public", "followers", "private"],
       default: "public",
     },
     status: { type: String, enum: ["active", "hidden"], default: "active" },
+    moderationCycle: String,
     hashtags: [String],
     revision: { type: Number, default: 0 },
   },
@@ -70,6 +72,7 @@ post.index({ "location.nameKey": 1 });
 post.index({ hashtags: 1 });
 const comment = new Schema(
   {
+    likedBy: { type: [ref("User")], select: false },
     post: ref("Post", { required: true, index: true }),
     author: ref("User", { required: true }),
     parent: ref("Comment", { default: null, index: true }),
@@ -96,9 +99,10 @@ follow.index({ follower: 1, following: 1 }, { unique: true });
 follow.index({ following: 1 });
 const notification = new Schema(
   {
+    message: String,
     recipient: ref("User", { required: true }),
     actor: ref("User", { required: true }),
-    type: { type: String, enum: ["like", "comment", "follow"] },
+    type: { type: String, enum: ["like", "comment", "follow", "post_hidden", "post_restored", "appeal_denied", "report_dismissed"] },
     post: ref("Post", { default: null }),
     comment: ref("Comment", { default: null }),
     read: { type: Boolean, default: false },
@@ -131,9 +135,31 @@ const report = new Schema(
 );
 report.index({ post: 1, reporter: 1 }, { unique: true });
 report.index({ status: 1, createdAt: -1 });
+const commentReport = new Schema({
+  ...report.obj, comment: ref("Comment",{required:true}), originalContent: {type:String,required:true}
+},opts);
+commentReport.index({reporter:1,comment:1},{unique:true});
+export const CommentReport = mongoose.model("CommentReport",commentReport);
+
+export async function removeCommentThread(id, session) {
+  const ids = await Comment.find({$or:[{_id:id},{parent:id}]}).session(session).distinct("_id");
+  await Notification.deleteMany({comment:{$in:ids}}).session(session);
+  await Comment.deleteMany({_id:{$in:ids}}).session(session);
+  await CommentReport.updateMany({comment:{$in:ids},status:"pending"},{$set:{status:"resolved",handledAt:new Date()}}).session(session);
+}
+const appeal = new Schema({
+  post: ref("Post",{required:true}), author: ref("User",{required:true}),
+  cycle: {type:String,required:true}, reason: {type:String,required:true,maxlength:1500},
+  status: {type:String,enum:["pending","approved","rejected"],default:"pending"},
+  handledAt: Date, handledBy: ref("User"),
+},opts);
+appeal.index({post:1,cycle:1},{unique:true});
+appeal.index({status:1,createdAt:-1,_id:-1});
+export const Appeal=mongoose.model("Appeal",appeal);
 const cleanup = new Schema(
   {
     publicId: { type: String, unique: true },
+    delivery: String,
     attempts: { type: Number, default: 0 },
   },
   opts,

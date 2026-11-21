@@ -4,19 +4,20 @@ export { errorMessage };
 
 export const userService = {
   getProfileByUsername: async (username) => {
-    const res = await api.get(`/users/${username}`);
+    const lookup = await api.get(`/users/by-username/${encodeURIComponent(username)}`);
+    const res = await api.get(`/users/${lookup.data.id}`);
     return res.data;
   },
 
-  getUserPosts: async (username, cursor = null) => {
-    const res = await api.get(`/users/${username}/posts`, {
-      params: cursor ? { cursor } : {},
+  getUserPosts: async (author, cursor = null, signal) => {
+    const res = await api.get("/posts", {
+      params: { author, cursor }, signal,
     });
     return res.data;
   },
 
   followUser: async (target) => {
-    const res = await api.post(`/users/${target}/follow`);
+    const res = await api.put(`/users/${target}/follow`);
     return res.data;
   },
 
@@ -31,16 +32,18 @@ export const userService = {
   },
 
   updateAvatar: async (formData) => {
-    const res = await api.put('/users/me/avatar', formData, {
+    const res = await api.patch('/users/me', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return res.data;
   },
 
   changePassword: async (payload) => {
-    const res = await api.put('/users/me/password', payload);
+    const res = await api.patch('/auth/password', payload);
     return res.data;
   },
+
+  getUnreadCount: async () => (await api.get('/notifications/unread-count')).data.count,
 
   getNotifications: async (cursor = null) => {
     const res = await api.get('/notifications', {

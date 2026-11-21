@@ -6,7 +6,7 @@ import { useImagePreviews } from '../hooks/useImagePreviews';
 import { errorMessage, userService } from '../services/userService';
 
 export default function EditProfilePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, setUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
@@ -59,23 +59,19 @@ export default function EditProfilePage() {
       setError('Tên hiển thị phải từ 2 đến 50 kí tự.');
       return;
     }
-    if (bio.length > 300) {
-      setError('Giới thiệu bản thân tối đa 300 kí tự.');
+    if (bio.length > 200) {
+      setError('Giới thiệu bản thân tối đa 200 kí tự.');
       return;
     }
 
     setSubmitting(true);
     try {
-      await userService.updateProfile({
-        displayName: displayName.trim(),
-        bio: bio.trim(),
-      });
-
-      if (avatarFiles.length > 0) {
-        const formData = new FormData();
-        formData.append('avatar', avatarFiles[0]);
-        await userService.updateAvatar(formData);
-      }
+      const formData=new FormData();
+      formData.append('displayName',displayName.trim());
+      formData.append('bio',bio.trim());
+      if(avatarFiles[0])formData.append('avatar',avatarFiles[0]);
+      const result=await userService.updateProfile(formData);
+      setUser(result.user);
 
       setSuccess('Cập nhật hồ sơ thành công!');
       setTimeout(() => {
@@ -138,11 +134,11 @@ export default function EditProfilePage() {
 
           <div>
             <label className="block text-sm font-semibold text-[#162424] dark:text-[#e8f0f0] mb-1.5">
-              Giới thiệu bản thân ({bio.length}/300)
+              Giới thiệu bản thân ({bio.length}/200)
             </label>
             <textarea
               rows={4}
-              maxLength={300}
+              maxLength={200}
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               placeholder="Chia sẻ đôi dòng về sở thích xê dịch của bạn..."

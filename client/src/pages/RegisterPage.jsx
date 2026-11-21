@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { api, errorMessage } from '../services/api.js';
 
 const fields = [
@@ -32,6 +32,7 @@ function fieldError(input, form) {
 }
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const {state} = useLocation();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [visible, setVisible] = useState({});
@@ -78,7 +79,7 @@ export default function RegisterPage() {
     setBusy(true);
     try {
       await api.post('/auth/register', { displayName, username, email, password });
-      navigate('/login', { replace: true, state: { registered: true } });
+      navigate('/login', { replace: true, state: { registered: true, postId:state?.postId,comment:state?.comment } });
     } catch (error) {
       setMessage(error.response?.status === 409
         ? 'Email hoặc tên người dùng đã được sử dụng.'
@@ -91,7 +92,7 @@ export default function RegisterPage() {
   return (
     <main className="scene flex min-h-screen items-center justify-center p-4">
       <section className="glass-card w-full max-w-[440px] rounded-[27px] p-7 sm:p-10">
-        <Link to="/login" className="font-bold text-[#123b3b]">Wanderly</Link>
+        <Link to="/login" state={{postId:state?.postId,comment:state?.comment}} className="font-bold text-[#123b3b]">Wanderly</Link>
         <h1 className="mt-4 text-3xl font-bold text-[#172a2b]">Tạo tài khoản</h1>
         <form noValidate onBlur={check} onChange={check} onSubmit={submit} className="mt-6 space-y-3">
           {fields.map(({ name, label, type = 'text', ...options }) => (
@@ -134,7 +135,7 @@ export default function RegisterPage() {
           </button>
         </form>
         <p className="mt-4 text-center text-sm">
-          Đã có tài khoản? <Link to="/login" className="font-bold underline">Đăng nhập</Link>
+          Đã có tài khoản? <Link to="/login" state={{postId:state?.postId,comment:state?.comment}} className="font-bold underline">Đăng nhập</Link>
         </p>
       </section>
     </main>

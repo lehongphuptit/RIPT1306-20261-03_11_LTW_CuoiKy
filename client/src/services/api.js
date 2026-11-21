@@ -12,7 +12,7 @@ export const tokenStorage = {
   },
 };
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_URL || "/api",
   timeout: 20000,
 });
 api.interceptors.request.use((config) => {
@@ -36,3 +36,22 @@ api.interceptors.response.use(
 export const errorMessage = (e) =>
   e.response?.data?.error?.message ||
   "Không kết nối được máy chủ. Kiểm tra backend và VITE_API_URL.";
+
+const postFieldHints = {
+  title:"Nhập tiêu đề từ 5 đến 120 ký tự.",
+  content:"Nhập nội dung từ 1 đến 5.000 ký tự.",
+  location:"Kiểm tra địa điểm (tối đa 120 ký tự) hoặc chọn lại từ danh sách.",
+  tripDate:"Chọn ngày hợp lệ, từ hôm nay trở về trước.",
+  cost:"Nhập chi phí từ 0 đến 999.999.999.999 đồng.",
+  visibility:"Chọn lại chế độ người xem.",
+  images:"Vui lòng kiểm tra lại các ảnh giữ lại."
+};
+export function postFieldErrors(error){
+  const errors={};
+  for(const issue of error.response?.data?.error?.fields || []){
+    const name=issue.field?.split(".")[0];
+    if(Object.hasOwn(postFieldHints,name)) errors[name]=name === "images" && issue.message === error.response.data.error.message
+      ? issue.message : postFieldHints[name];
+  }
+  return errors;
+}

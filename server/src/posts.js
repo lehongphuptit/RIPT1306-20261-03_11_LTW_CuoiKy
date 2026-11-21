@@ -5,8 +5,8 @@ import {
   User,
   Follow,
   Like,
-  Comment,
-  Report,
+  Comment, CommentReport, removeCommentThread,
+  Report, Appeal,
   Notification,
   transaction,
   normalize,
@@ -25,7 +25,8 @@ import {
   pagination,
   page,
 } from "./core.js";
-import { postUpload, uploadImages, enqueue } from "./media.js";
+import { postUpload, uploadImages, enqueue, imageLinks, sendImage, protectExisting } from "./media.js";
+import { publicationImages } from "./drafts.js";
 export const posts = Router();
 const date = z
   .string()
@@ -57,8 +58,10 @@ const body = z.object({
   location,
   tripDate: date,
   cost: z.coerce.number().finite().min(0).max(999999999999),
-  visibility: z.enum(["public", "followers"]).default("public"),
+  visibility: z.enum(["public", "followers", "private"]),
 });
+const createBody = body.extend({ visibility: body.shape.visibility.default("public") });
+const updateBody = body.partial();
 function input(req, partial = false) {
   const raw = { ...req.body };
   for (const key of ["location", "keepImageIds"])
@@ -66,10 +69,10 @@ function input(req, partial = false) {
       try {
         raw[key] = JSON.parse(raw[key]);
       } catch {
-        fail(400, key + " phải là JSON");
+        fail(400, "Dữ liệu gửi lên sai định dạng.", key === "keepImageIds" ? "images" : key);
       }
     }
-  const values = parse(partial ? body.partial() : body, raw);
+  const values = parse(partial ? updateBody : createBody, raw);
   if (values.location)
     values.location.nameKey = normalize(values.location.name);
   if (values.content !== undefined)
@@ -85,7 +88,7 @@ function input(req, partial = false) {
     keep:
       raw.keepImageIds === undefined
         ? undefined
-        : parse(z.array(z.string()).max(6), raw.keepImageIds),
+        : parse(z.object({images:z.array(z.string()).max(6)}), {images:raw.keepImageIds}).images,
   };
 }
 async function decorate(list, u) {
@@ -103,7 +106,9 @@ async function decorate(list, u) {
     u ? Like.find({ post: { $in: ids }, user: u._id }) : [],
   ]);
   return list.map((p) => ({
-    ...p.toObject(),
+    ...p.toObject({transform: (_doc, value) => { delete value.savedBy; return value; }}),
+    images:imageLinks(p.images,"/posts/"+p._id+"/image"),
+    saved: !!u && (p.savedBy || []).some(id => same(id,u._id)),
     likeCount: likes.find((l) => same(l._id, p._id))?.count || 0,
     commentCount: comments.find((l) => same(l._id, p._id))?.count || 0,
     liked: mine.some((l) => same(l.post, p._id)),
@@ -112,6 +117,7 @@ async function decorate(list, u) {
 async function list(req, res, feed = false) {
   const { limit, filter } = pagination(req);
   const filters = [await visibleFilter(req.user), filter];
+  if (req.path === "/saved") filters.push({savedBy:req.user._id});
   if (req.query.author) filters.push({ author: oid(req.query.author) });
   if (feed) {
     const followed = await Follow.find({ follower: req.user._id }).distinct(
@@ -130,34 +136,88 @@ async function list(req, res, feed = false) {
         : { "location.nameKey": { $regex: literal } },
     );
   }
-  const items = await Post.find({ $and: filters })
+  const items = await Post.find({ $and: filters }).select("+savedBy")
     .populate("author", publicFields)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1);
   res.json(page(await decorate(items, req.user), limit));
 }
 posts.get("/posts", (req, res) => list(req, res));
+posts.get("/search/suggestions", async (req, res) => {
+  const term = String(req.query.q || "").trim().slice(0, 80);
+  const text = term.replace(/^[@#]/, "");
+  if (!text) return res.json({ users: [], places: [], tags: [] });
+  const escape = value => value.replace(/[.*+?^$\{}()|[\]\\]/g, "\\$&");
+  const name = new RegExp(escape(normalize(text)));
+  const tag = new RegExp(escape(text.toLowerCase()));
+  const visible = await visibleFilter(req.user);
+  const [users, locations, hashtags] = await Promise.all([
+    term.startsWith("#") ? [] : User.find({ role: "member", locked: false, searchKey: name })
+      .select(publicFields).sort({ username: 1 }).limit(4).lean(),
+    Post.aggregate([
+      { $match: { $and: [visible, { "location.nameKey": name }] } },
+      { $group: { _id: "$location.nameKey", name: { $min: "$location.name" } } },
+      { $sort: { _id: 1 } }, { $limit: 4 }
+    ]),
+    Post.aggregate([
+      { $match: { $and: [visible, { hashtags: tag }] } },
+      { $unwind: "$hashtags" }, { $match: { hashtags: tag } },
+      { $group: { _id: "$hashtags" } }, { $sort: { _id: 1 } }, { $limit: 3 }
+    ])
+  ]);
+  res.json({ users, places: locations.map(item => item.name), tags: hashtags.map(item => item._id) });
+});
+posts.get("/saved", member, (req,res)=>list(req,res));
 posts.get("/feed", member, (req, res) => list(req, res, true));
+posts.post("/posts/:id/appeal",member,async(req,res)=>{
+  const {reason,cycle}=parse(z.object({reason:z.string().trim().min(1).max(1500),cycle:z.string().max(64)}),req.body);
+  await transaction(async session=>{
+    const p=await getPost(req.params.id,req.user,session,true);
+    own(p,req.user);
+    if(p.status!=="hidden" || cycle!==(p.moderationCycle || String(p._id)))
+      fail(409,"Trạng thái bài viết đã thay đổi. Hãy tải lại trang.");
+    if(await Appeal.exists({post:p._id,cycle}).session(session))
+      fail(409,"Bạn đã gửi khiếu nại cho lần ẩn bài này.");
+    await Appeal.create([{post:p._id,author:req.user._id,reason,cycle}],{session});
+  });
+  res.status(201).json({status:"pending"});
+});
+posts.get("/posts/:id/image", async(req,res)=>{
+  const post=await getPost(req.params.id,req.user);
+  await sendImage(post.images,req,res);
+});
 posts.get("/posts/:id", async (req, res) => {
   const p = await getPost(req.params.id, req.user);
+  const saved = req.user && await Post.exists({_id:p._id, savedBy:req.user._id});
+  const appeal=p.status==="hidden" && same(p.author,req.user?._id)
+    ? await Appeal.findOne({post:p._id,cycle:p.moderationCycle || String(p._id)}).select("status reason").lean()
+    : null;
   await p.populate("author", publicFields);
-  res.json({ post: (await decorate([p], req.user))[0] });
+  res.json({ post: { ...(await decorate([p], req.user))[0], appeal, saved: !!saved } });
 });
 posts.post("/posts", member, postUpload, async (req, res) => {
   const { values } = input(req);
-  const images = await uploadImages(req.files);
+  const images = await uploadImages(req.files,true);
   try {
-    const p = await Post.create({ ...values, images, author: req.user._id });
-    res.status(201).json({ post: p });
+    let p;
+    await transaction(async session => {
+      const attached = await publicationImages(req, "new", images, session);
+      [p] = await Post.create([{ ...values, images: attached, author: req.user._id }], { session });
+    });
+    res.status(201).json({ post: {...p.toObject(),images:imageLinks(p.images,"/posts/"+p._id+"/image")} });
   } catch (e) {
     await enqueue(images);
     throw e;
   }
 });
 posts.patch("/posts/:id", member, postUpload, async (req, res) => {
-  own(await getPost(req.params.id, req.user), req.user);
+  const original=await getPost(req.params.id, req.user);
+  own(original,req.user);
   const { values, keep } = input(req, true);
-  const newImages = await uploadImages(req.files);
+  if ((values.visibility || original.visibility) !== "public") {
+    await protectExisting(Post,original._id,original.images.filter(i=>!keep || keep.includes(i.publicId)));
+  }
+  const newImages = await uploadImages(req.files,true);
   let updated;
   try {
     await transaction(async (session) => {
@@ -168,8 +228,9 @@ posts.patch("/posts/:id", member, postUpload, async (req, res) => {
           ? p.images
           : p.images.filter((i) => keep.includes(i.publicId));
       if (keep && retained.length !== new Set(keep).size)
-        fail(400, "Ảnh giữ lại không thuộc bài");
-      if (retained.length + newImages.length > 6) fail(400, "Tối đa 6 ảnh");
+        fail(400, "Ảnh giữ lại không thuộc bài", "images");
+      const attached = await publicationImages(req, p._id.toString(), newImages, session);
+      if (retained.length + attached.length > 6) fail(400, "Tối đa 6 ảnh", "images");
       await enqueue(
         p.images.filter(
           (i) => !retained.some((r) => r.publicId === i.publicId),
@@ -177,7 +238,7 @@ posts.patch("/posts/:id", member, postUpload, async (req, res) => {
         session,
       );
       Object.assign(p, values);
-      p.images = [...retained, ...newImages];
+      p.images = [...retained, ...attached];
       await p.save({ session });
       updated = p;
     });
@@ -185,14 +246,14 @@ posts.patch("/posts/:id", member, postUpload, async (req, res) => {
     await enqueue(newImages);
     throw e;
   }
-  res.json({ post: updated });
+  res.json({ post: {...updated.toObject(),images:imageLinks(updated.images,"/posts/"+updated._id+"/image")} });
 });
 posts.delete("/posts/:id", member, async (req, res) => {
   await transaction(async (session) => {
     const p = await getPost(req.params.id, req.user, session, true);
     own(p, req.user);
     await enqueue(p.images, session);
-    for (const model of [Like, Comment, Notification, Report])
+    for (const model of [Like, Comment, Notification, Report, CommentReport, Appeal])
       await model.deleteMany({ post: p._id }).session(session);
     await p.deleteOne({ session });
   });
@@ -222,17 +283,37 @@ posts.delete("/posts/:id/like", member, async (req, res) => {
   });
   res.json({ liked: false });
 });
+for (const [method, operator] of [["put", "$addToSet"], ["delete", "$pull"]]) {
+  posts[method]("/posts/:id/save",member,async(req,res)=>{
+    await transaction(async session=>{
+      const post=await getPost(req.params.id,req.user,session,true);
+      await Post.updateOne({_id:post._id},{[operator]:{savedBy:req.user._id}},{session});
+    });
+    res.json({saved:method==="put"});
+  });
+  posts[method]("/comments/:id/like",member,async(req,res)=>{
+    let count;
+    await transaction(async session=>{
+      const c=await Comment.findById(oid(req.params.id)).session(session);
+      if(!c||await User.exists({_id:c.author,locked:true}).session(session))fail(404,"Không tìm thấy bình luận");
+      await getPost(String(c.post),req.user,session,true);
+      const updated=await Comment.findByIdAndUpdate(c._id,{[operator]:{likedBy:req.user._id}},{session,new:true}).select("+likedBy");
+      count=updated.likedBy.length;
+    });
+    res.json({liked:method==="put",likeCount:count});
+  });
+}
 posts.get("/posts/:id/comments", async (req, res) => {
   const p = await getPost(req.params.id, req.user);
   const { limit, filter } = pagination(req);
   const locked = await User.find({ locked: true }).distinct("_id");
   const items = await Comment.find({
     $and: [{ post: p._id, author: { $nin: locked } }, filter],
-  })
+  }).select("+likedBy")
     .populate("author", publicFields)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit + 1);
-  res.json(page(items, limit));
+  res.json(page(items.map(c=>{const value=c.toObject();delete value.likedBy;return {...value, likeCount:(c.likedBy||[]).length,liked:!!req.user&&(c.likedBy||[]).some(id=>same(id,req.user._id))};}), limit));
 });
 posts.post("/posts/:id/comments", member, async (req, res) => {
   const b = parse(
@@ -262,6 +343,29 @@ posts.post("/posts/:id/comments", member, async (req, res) => {
   });
   res.status(201).json({ comment: result });
 });
+posts.patch("/comments/:id", member, async (req,res) => {
+  const {content}=parse(z.object({content:z.string().trim().min(1).max(1000)}),req.body);
+  await transaction(async session=>{
+    const c=await Comment.findById(oid(req.params.id)).session(session);
+    if(!c) fail(404,"Không tìm thấy bình luận");
+    await getPost(String(c.post),req.user,session,true);
+    if(!same(c.author,req.user._id)) fail(403,"Chỉ tác giả mới được sửa bình luận");
+    c.content=content;
+    await c.save({session});
+  });
+  res.json({content});
+});
+posts.post("/comments/:id/reports",member,async(req,res)=>{
+  const {reason}=parse(z.object({reason:z.enum(["spam","offensive","false_info","other"])}),req.body);
+  await transaction(async session=>{
+    const c=await Comment.findById(oid(req.params.id)).session(session);
+    if(!c) fail(404,"Không tìm thấy bình luận");
+    await getPost(String(c.post),req.user,session,true);
+    if(same(c.author,req.user._id)) fail(400,"Không thể báo cáo bình luận của chính mình");
+    await CommentReport.create([{post:c.post,comment:c._id,originalContent:c.content,reporter:req.user._id,reason}],{session});
+  });
+  res.status(201).json({message:"Đã gửi báo cáo"});
+});
 posts.delete("/comments/:id", member, async (req, res) => {
   await transaction(async (session) => {
     const c = await Comment.findById(oid(req.params.id)).session(session);
@@ -269,11 +373,7 @@ posts.delete("/comments/:id", member, async (req, res) => {
     const p = await getPost(String(c.post), req.user, session, true);
     if (!same(c.author, req.user._id) && !same(p.author, req.user._id))
       fail(403, "Không có quyền xóa bình luận");
-    const ids = await Comment.find({ $or: [{ _id: c._id }, { parent: c._id }] })
-      .session(session)
-      .distinct("_id");
-    await Notification.deleteMany({ comment: { $in: ids } }).session(session);
-    await Comment.deleteMany({ _id: { $in: ids } }).session(session);
+    await removeCommentThread(c._id, session);
   });
   res.status(204).end();
 });
@@ -285,6 +385,7 @@ posts.post("/posts/:id/reports", member, async (req, res) => {
     }),
     req.body,
   );
+  if (b.reason === "other" && !b.note) fail(400, "Vui lòng nhập lý do báo cáo.");
   await transaction(async (session) => {
     const p = await getPost(req.params.id, req.user, session, true);
     if (same(p.author, req.user._id))

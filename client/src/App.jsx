@@ -1,3 +1,4 @@
+import HomePage from './pages/HomePage.jsx';
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
@@ -56,17 +57,17 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          <Route path="/" element={<Navigate to="/account" replace />} />
+          <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          <Route path="/account" element={<Account />} />
-          <Route path="/posts/new" element={<PostFormPage />} />
-          <Route path="/posts/:id/edit" element={<PostFormPage />} />
-          <Route path="/posts/:id" element={<PostDetailPage />} />
-          <Route path="/u/:username" element={<ProfilePage />} />
-          <Route path="/settings/profile" element={<EditProfilePage />} />
-          <Route path="/settings/password" element={<ChangePasswordPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/account" element={<HomePage><Account /></HomePage>} />
+          <Route path="/posts/new" element={<Navigate to="/?view=create" replace />} />
+          <Route path="/posts/:id/edit" element={<HomePage><PostFormPage /></HomePage>} />
+          <Route path="/posts/:id" element={<HomePage><PostDetailPage /></HomePage>} />
+          <Route path="/u/:username" element={<HomePage><ProfilePage /></HomePage>} />
+          <Route path="/settings/profile" element={<HomePage><EditProfilePage /></HomePage>} />
+          <Route path="/settings/password" element={<HomePage><ChangePasswordPage /></HomePage>} />
+          <Route path="/notifications" element={<HomePage><NotificationsPage /></HomePage>} />
           <Route
             path="*"
             element={

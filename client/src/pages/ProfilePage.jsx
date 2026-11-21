@@ -1,3 +1,6 @@
+import {notify} from '../journal/Feedback.jsx';
+import JournalImage from '../journal/JournalImage.jsx';
+import TaggedText from '../journal/TaggedText.jsx';
 import React, { useEffect, useState } from 'react';
 import { Calendar, Edit3, Heart, MapPin, MessageCircle, Settings, UserCheck, UserPlus } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -6,8 +9,14 @@ import { errorMessage, userService } from '../services/userService';
 
 export default function ProfilePage() {
   const { username } = useParams();
-  const navigate = useNavigate();
   const { user: currentUser } = useAuth();
+  return <Profile key={username+':'+(currentUser?._id||'guest')} username={username} currentUser={currentUser}/>;
+}
+
+function Profile({username,currentUser}) {
+  const navigate = useNavigate();
+  const [revision,setRevision]=useState(0);
+  const [postsError,setPostsError]=useState('');
 
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -17,32 +26,44 @@ export default function ProfilePage() {
   const [followLoading, setFollowLoading] = useState(false);
 
   useEffect(() => {
+    let active=true;
     setLoading(true);
     setNotFound(false);
 
     (async () => {
       try {
         const res = await userService.getProfileByUsername(username);
-        const userData = res.user || res;
+        const userData = {...res.user, followerCount:res.followers, followingCount:res.following, isFollowing:res.isFollowing};
+        if(!active)return;
         setProfile(userData);
 
-        if (Array.isArray(res.posts)) {
-          setPosts(res.posts);
-        } else {
-          try {
-            const postRes = await userService.getUserPosts(username);
-            setPosts(postRes.items || postRes.posts || postRes || []);
-          } catch {
-            setPosts([]);
-          }
-        }
+
       } catch {
-        setNotFound(true);
+        if(active)setNotFound(true);
       } finally {
-        setLoading(false);
+        if(active)setLoading(false);
       }
     })();
-  }, [username]);
+    return ()=>{active=false;};
+  }, [username,currentUser?._id]);
+
+  const profileId=profile?._id;
+  useEffect(()=>{
+    if(!profileId)return;
+    const controller=new AbortController();
+    setPostsError('');
+    (async()=>{
+      const list=[];
+      let cursor=null;
+      do {
+        const result=await userService.getUserPosts(profileId,cursor,controller.signal);
+        list.push(...result.data);
+        cursor=result.nextCursor;
+      } while(cursor && !controller.signal.aborted);
+      if(!controller.signal.aborted)setPosts(list);
+    })().catch(err=>{if(!controller.signal.aborted)setPostsError(errorMessage(err));});
+    return ()=>controller.abort();
+  },[profileId,revision]);
 
   const handleToggleFollow = async () => {
     if (!currentUser) {
@@ -55,26 +76,19 @@ export default function ProfilePage() {
     const prevFollowers = profile.followerCount || 0;
 
     setFollowLoading(true);
-    setProfile((prev) => ({
-      ...prev,
-      isFollowing: !prevFollowing,
-      followerCount: prevFollowing ? Math.max(0, prevFollowers - 1) : prevFollowers + 1,
-    }));
-
     try {
-      const target = profile.username || profile._id;
+      const target = profile._id;
       if (prevFollowing) {
         await userService.unfollowUser(target);
       } else {
         await userService.followUser(target);
       }
+      setProfile(prev=>({...prev,isFollowing:!prevFollowing,
+        followerCount:Math.max(0,prevFollowers+(prevFollowing?-1:1))}));
+      if(prevFollowing)setPosts(list=>list.filter(post=>post.visibility==='public'));
+      setRevision(n=>n+1);
     } catch (err) {
-      setProfile((prev) => ({
-        ...prev,
-        isFollowing: prevFollowing,
-        followerCount: prevFollowers,
-      }));
-      alert(errorMessage(err));
+      notify(errorMessage(err),'error');
     } finally {
       setFollowLoading(false);
     }
@@ -218,7 +232,7 @@ export default function ProfilePage() {
       </div>
 
       {activeTab === 'posts' ? (
-        posts.length === 0 ? (
+        postsError ? <p role="alert">{postsError} <button onClick={()=>setRevision(n=>n+1)}>Thử tải lại bài viết</button></p> : posts.length === 0 ? (
           <div className="rounded-3xl bg-white/70 p-10 text-center space-y-3">
             <p className="text-sm text-[#4a6363]">Chưa có nhật ký chuyến đi nào được đăng.</p>
             {isOwnProfile && (
@@ -233,14 +247,13 @@ export default function ProfilePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {posts.map((post) => (
-              <Link
+              <article
                 key={post._id}
-                to={`/posts/${post._id}`}
                 className="group rounded-3xl bg-white/75 dark:bg-[#162424]/85 backdrop-blur-xl border border-white/70 overflow-hidden shadow-md hover:shadow-xl transition flex flex-col"
               >
-                {post.images?.[0]?.url ? (
+                <Link to={`/posts/${post._id}`} aria-label={post.title}>{post.images?.[0]?.url ? (
                   <div className="aspect-[16/10] overflow-hidden bg-black/10">
-                    <img
+                    <JournalImage
                       src={post.images[0].url}
                       alt={post.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
@@ -250,15 +263,15 @@ export default function ProfilePage() {
                   <div className="aspect-[16/10] bg-[#DDE7E8]/70 flex items-center justify-center text-xs text-[#4a6363]">
                     Không có ảnh bìa
                   </div>
-                )}
+                )}</Link>
 
                 <div className="p-5 flex-1 flex flex-col justify-between space-y-3">
                   <div>
                     <h3 className="text-base font-bold text-[#162424] dark:text-[#e8f0f0] line-clamp-1">
-                      {post.title}
+                      <Link to={`/posts/${post._id}`}>{post.title}</Link>
                     </h3>
                     <p className="text-xs text-[#4a6363] dark:text-[#9eb7b8] line-clamp-2 mt-1">
-                      {post.content}
+                      <TaggedText text={post.content}/>
                     </p>
                   </div>
 
@@ -277,7 +290,7 @@ export default function ProfilePage() {
                     </div>
                   </div>
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
         )

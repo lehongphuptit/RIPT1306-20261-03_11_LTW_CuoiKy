@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import {notify} from '../journal/Feedback.jsx';
+import React, { useEffect, useRef, useState } from 'react';
 import { Bell, CheckCheck, Heart, MessageCircle, ShieldAlert, UserPlus } from 'lucide-react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -11,25 +12,42 @@ export default function NotificationsPage() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const pending = useRef(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const fetchNotifications = async (cursor = null, append = false) => {
+    if (pending.current) return;
+    const request = Symbol();
+    pending.current = request;
+    setLoadingMore(append);
     try {
       const res = await userService.getNotifications(cursor);
-      const items = res.items || res.notifications || res || [];
-      setNotifications((prev) => (append ? [...prev, ...items] : items));
+      if (pending.current !== request) return;
+      setNotifications(prev => append
+        ? Array.from(new Map([...prev, ...res.data].map(item => [item._id, item])).values())
+        : res.data);
       setNextCursor(res.nextCursor || null);
-      setHasMore(Boolean(res.hasMore));
+      setHasMore(Boolean(res.nextCursor));
     } catch (err) {
-      console.error(err);
+      if (pending.current === request) notify(errorMessage(err), 'error');
     } finally {
-      setLoading(false);
+      if (pending.current === request) {
+        pending.current = null;
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
+  const userId = user?._id;
   useEffect(() => {
-    if (user) {
-      fetchNotifications();
-    }
-  }, [user]);
+    setNotifications([]);
+    setNextCursor(null);
+    setHasMore(false);
+    setLoading(true);
+    if (userId) fetchNotifications();
+    return () => { pending.current = null; };
+  }, [userId]);
 
   if (authLoading) {
     return <div className="max-w-2xl mx-auto py-12 text-center text-[#4a6363]">Đang kiểm tra phiên đăng nhập...</div>;
@@ -40,22 +58,19 @@ export default function NotificationsPage() {
   }
 
   const handleMarkRead = async (item) => {
-    if (item.isRead) return;
-    setNotifications((prev) =>
-      prev.map((n) => (n._id === item._id ? { ...n, isRead: true } : n)),
-    );
+    if (item.read) return;
     try {
       await userService.markNotificationRead(item._id);
-    } catch {
-    }
+      setNotifications(prev=>prev.map(n=>n._id===item._id?{...n,read:true}:n));
+    } catch(err){notify(errorMessage(err),'error');}
   };
 
   const handleMarkAllRead = async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     try {
       await userService.markAllNotificationsRead();
+      setNotifications(prev=>prev.map(n=>({...n,read:true})));
     } catch (err) {
-      alert(errorMessage(err));
+      notify(errorMessage(err),'error');
     }
   };
 
@@ -74,8 +89,9 @@ export default function NotificationsPage() {
   };
 
   const getTargetLink = (item) => {
-    if (item.post?._id || item.postId) {
-      return `/posts/${item.post?._id || item.postId}`;
+    if(item.type==='report_dismissed')return '/notifications';
+    if (item.post) {
+      return `/posts/${item.post?._id || item.post}`;
     }
     if (item.actor?.username) {
       return `/u/${item.actor.username}`;
@@ -92,7 +108,7 @@ export default function NotificationsPage() {
             <h1 className="text-xl font-bold text-[#162424] dark:text-[#e8f0f0]">Thông báo</h1>
           </div>
 
-          {notifications.some((n) => !n.isRead) && (
+          {notifications.some((n) => !n.read) && (
             <button
               type="button"
               onClick={handleMarkAllRead}
@@ -116,7 +132,7 @@ export default function NotificationsPage() {
                 to={getTargetLink(item)}
                 onClick={() => handleMarkRead(item)}
                 className={`flex items-start gap-3 p-4 rounded-2xl border transition ${
-                  item.isRead
+                  item.read
                     ? 'bg-white/50 border-white/50 opacity-80'
                     : 'bg-white border-[#1F3333]/20 shadow-sm'
                 }`}
@@ -137,13 +153,14 @@ export default function NotificationsPage() {
                     {new Date(item.createdAt).toLocaleString('vi-VN')}
                   </span>
                 </div>
-                {!item.isRead && <span className="w-2.5 h-2.5 rounded-full bg-[#1F3333] shrink-0 mt-2" />}
+                {!item.read && <span className="w-2.5 h-2.5 rounded-full bg-[#1F3333] shrink-0 mt-2" />}
               </Link>
             ))}
 
             {hasMore && (
               <button
                 type="button"
+                disabled={loadingMore}
                 onClick={() => fetchNotifications(nextCursor, true)}
                 className="w-full py-2.5 rounded-full text-xs font-semibold bg-white/80 hover:bg-white text-[#1F3333]"
               >

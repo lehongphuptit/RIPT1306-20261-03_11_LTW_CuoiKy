@@ -1,3 +1,5 @@
+import {notify} from '../journal/Feedback.jsx';
+import {postFieldErrors} from '../services/api.js';
 import React, { useEffect, useState } from 'react';
 import { MapPin } from 'lucide-react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
@@ -6,7 +8,10 @@ import VisibilityPicker from '../components/posts/VisibilityPicker';
 import { useAuth } from '../context/AuthContext';
 import { useDebounce } from '../hooks/useDebounce';
 import { errorMessage, postService } from '../services/postService';
-
+const todayVN = () =>
+  new Date(Date.now() + 7 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 export default function PostFormPage() {
   const { id } = useParams();
   const isEditMode = Boolean(id);
@@ -48,7 +53,7 @@ export default function PostFormPage() {
         setVisibility(post.visibility || 'public');
         setExistingImages(post.images || []);
       } catch {
-        alert('Không tìm thấy bài viết hoặc bạn không có quyền sửa.');
+        notify('Không tìm thấy bài viết hoặc bạn không có quyền sửa.','error');
         navigate('/');
       } finally {
         setLoadingInit(false);
@@ -93,28 +98,11 @@ export default function PostFormPage() {
   }
 
   const handleChooseSuggestion = async (item) => {
-    const placeId = item.placeId || item.place_id;
     const label = item.name || item.description;
     setLocationInput(label);
     setShowSuggestions(false);
 
-    if (!placeId) {
-      setSelectedPlace({ name: label });
-      return;
-    }
-
-    try {
-      const detail = await postService.getPlaceDetail(placeId);
-      setSelectedPlace({
-        name: detail.name || label,
-        placeId,
-        address: detail.address || '',
-        lat: detail.lat,
-        lng: detail.lng,
-      });
-    } catch {
-      setSelectedPlace({ name: label, placeId });
-    }
+    setSelectedPlace({...item,name:label});
   };
 
   const validate = () => {
@@ -128,7 +116,8 @@ export default function PostFormPage() {
     if (!locationInput.trim()) {
       nextErrors.location = 'Vui lòng nhập hoặc chọn địa điểm chuyến đi.';
     }
-    if (tripDate && new Date(tripDate) > new Date()) {
+    if (!tripDate) nextErrors.tripDate='Vui lòng chọn ngày đi.';
+    else if (tripDate > todayVN()) {
       nextErrors.tripDate = 'Ngày đi không được lớn hơn ngày hiện tại.';
     }
     if (cost !== '' && Number(cost) < 0) {
@@ -157,12 +146,10 @@ export default function PostFormPage() {
       formData.append('location', JSON.stringify(locationPayload));
 
       if (tripDate) formData.append('tripDate', tripDate);
-      if (cost !== '') formData.append('cost', String(Number(cost)));
+      formData.append('cost',String(Number(cost)||0));
 
       if (isEditMode) {
-        existingImages.forEach((img) => {
-          formData.append('keepImageIds[]', img.publicId);
-        });
+        formData.append('keepImageIds',JSON.stringify(existingImages.map(img=>img.publicId)));
       }
 
       newFiles.forEach((file) => {
@@ -176,7 +163,8 @@ export default function PostFormPage() {
       const savedPost = res.post || res;
       navigate(`/posts/${savedPost._id || id}`);
     } catch (err) {
-      setErrors({ submit: errorMessage(err) });
+      const fields=postFieldErrors(err);
+      setErrors(Object.keys(fields).length ? fields : {submit:errorMessage(err)});
     } finally {
       setSubmitting(false);
     }
@@ -266,7 +254,7 @@ export default function PostFormPage() {
               </label>
               <input
                 type="date"
-                max={new Date().toISOString().slice(0, 10)}
+                max={todayVN()}
                 value={tripDate}
                 onChange={(e) => setTripDate(e.target.value)}
                 className="w-full rounded-full bg-white dark:bg-[#182828] px-4 py-2.5 text-sm border border-white/70 focus:outline-none focus:ring-2 focus:ring-[#1F3333]"
@@ -300,7 +288,9 @@ export default function PostFormPage() {
             onChangeNewFiles={setNewFiles}
           />
 
+          {errors.images && <p role="alert">{errors.images}</p>}
           <VisibilityPicker value={visibility} onChange={setVisibility} />
+          {errors.visibility && <p role="alert">{errors.visibility}</p>}
 
           {errors.submit && (
             <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/30 text-xs font-medium text-red-600">

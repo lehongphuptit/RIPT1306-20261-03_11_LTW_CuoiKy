@@ -1,3 +1,4 @@
+import {tokenStorage} from '../services/api';
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -43,13 +44,9 @@ export default function ChangePasswordPage() {
     setSubmitting(true);
     try {
       await userService.changePassword({ currentPassword, newPassword });
-      setSuccess('Đổi mật khẩu thành công!');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setTimeout(() => {
-        navigate(`/u/${user.username}`);
-      }, 1000);
+      tokenStorage.clear();
+      window.dispatchEvent(new Event('td:logout'));
+      navigate('/login',{replace:true});
     } catch (err) {
       setError(errorMessage(err));
     } finally {

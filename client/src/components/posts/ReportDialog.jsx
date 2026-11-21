@@ -1,3 +1,4 @@
+import { useBackdropDismiss } from '../../journal/useBackdropDismiss.js';
 import React, { useState } from 'react';
 import { Flag, X } from 'lucide-react';
 import { errorMessage, postService } from '../../services/postService';
@@ -16,6 +17,7 @@ export default function ReportDialog({ postId, isOpen, onClose }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  const backdrop = useBackdropDismiss(() => { if (!loading && !success) onClose(); });
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {
@@ -42,7 +44,7 @@ export default function ReportDialog({ postId, isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f1919]/50 backdrop-blur-sm p-4">
+    <div {...backdrop} className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f1919]/50 backdrop-blur-sm p-4">
       <div className="w-full max-w-md rounded-3xl bg-[#DDE7E8]/95 dark:bg-[#162424]/95 backdrop-blur-xl border border-white/70 dark:border-white/15 p-6 shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2 text-[#162424] dark:text-[#e8f0f0]">
@@ -88,9 +90,10 @@ export default function ReportDialog({ postId, isOpen, onClose }) {
 
             <div>
               <label className="block text-sm font-medium text-[#162424] dark:text-[#e8f0f0] mb-1">
-                Mô tả chi tiết (không bắt buộc)
+                {reason === 'other' ? 'Lý do báo cáo (bắt buộc)' : 'Mô tả chi tiết (không bắt buộc)'}
               </label>
               <textarea
+                required={reason === 'other'}
                 rows={3}
                 maxLength={500}
                 value={note}
@@ -112,8 +115,8 @@ export default function ReportDialog({ postId, isOpen, onClose }) {
               </button>
               <button
                 type="submit"
-                disabled={loading}
-                className="px-6 py-2.5 rounded-full text-sm font-semibold bg-[#1F3333] hover:bg-[#142222] text-white disabled:opacity-50"
+                disabled={loading || (reason === 'other' && !note.trim())}
+                className="report-submit"
               >
                 {loading ? 'Đang gửi...' : 'Gửi báo cáo'}
               </button>

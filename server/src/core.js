@@ -2,8 +2,8 @@ import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import { z } from "zod";
 import { User, Post, Follow, Notification } from "./models.js";
-export const fail = (status, message) => {
-  throw Object.assign(new Error(message), { status });
+export const fail = (status, message, field) => {
+  throw Object.assign(new Error(message), { status, field });
 };
 export const oid = (id) => {
   if (typeof id !== "string" || !mongoose.isObjectIdOrHexString(id))
@@ -93,7 +93,7 @@ export function admin(req, res, next) {
   next();
 }
 export async function visibleFilter(u, session) {
-  if (u?.role === "admin") return {};
+  if (u?.role === "admin") return { visibility: { $ne: "private" } };
   const locked = await User.find({ locked: true })
     .select("_id")
     .session(session || null);

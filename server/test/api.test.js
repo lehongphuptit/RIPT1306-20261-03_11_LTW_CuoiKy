@@ -104,6 +104,12 @@ test("Private post: guest/nonfollower 404, follow unlocks, unfollow revokes; no 
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const id = r.body.post._id;
   assert.equal((await api("get", "/posts/" + id)).status, 404);
+  const hidden = await api("get", "/search/suggestions?q=%23hoian");
+  assert.equal(hidden.status, 200);
+  assert.deepEqual(hidden.body.tags, []);
+  const mine = await api("get", "/search/suggestions?q=%23hoian", a.token);
+  assert.equal(mine.status, 200);
+  assert.ok(mine.body.tags.includes("hoian"));
   assert.equal((await api("get", "/posts/" + id, b.token)).status, 404);
   assert.equal(
     (await api("put", "/users/" + b.user._id + "/follow", b.token)).status,
@@ -123,6 +129,32 @@ test("Private post: guest/nonfollower 404, follow unlocks, unfollow revokes; no 
   assert.equal((await api("get", "/posts/" + id, b.token)).status, 404);
   assert.equal((await api("get", "/posts/" + id, owner.token)).status, 200);
 });
+test("Partial edit preserves visibility and kept images, and identifies invalid fields", async () => {
+  for (const visibility of ["private", "followers"]) {
+    const created = await api("post", "/posts", a.token).send({ ...payload, visibility });
+    assert.equal(created.status, 201);
+    const url = "/posts/" + created.body.post._id;
+    try {
+      const id = "travel-diary/test-image";
+      await Post.updateOne({ _id: created.body.post._id }, { $set: { images: [
+        { publicId: id, protectedId: id, url: "https://example.com/test-image.jpg" }
+      ] } });
+      const edited = await api("patch", url, a.token)
+        .field("title", "Tiêu đề đã sửa").field("keepImageIds", JSON.stringify([id]));
+      assert.equal(edited.status, 200);
+      assert.equal(edited.body.post.visibility, visibility);
+      assert.equal(edited.body.post.images[0].publicId, id);
+      assert.equal((await api("get", url)).status, 404);
+      assert.equal((await api("get", url + "/image?id=" + encodeURIComponent(id))).status, 404);
+      const invalid = await api("patch", url, a.token).send({ cost: -1 });
+      assert.equal(invalid.status, 400);
+      assert.ok(invalid.body.error.fields.some(issue => issue.field === "cost"));
+    } finally {
+      await api("delete", url, a.token);
+    }
+  }
+});
+
 test("Like uniqueness, comment root normalization, reports and hide/unhide, locked author", async () => {
   let r = await api("post", "/posts", a.token).send(payload);
   const id = r.body.post._id;
@@ -198,6 +230,7 @@ test("Like uniqueness, comment root normalization, reports and hide/unhide, lock
     [401, 403].includes((await api("get", "/auth/me", a.token)).status),
   );
   assert.equal((await api("get", "/posts/" + id)).status, 404);
+
   await api("patch", "/admin/users/" + a.user._id, owner.token).send({
     locked: false,
   });
@@ -309,4 +342,23 @@ test("Upload rejects invalid MIME and fake image bytes; password change revokes 
     ).status,
     200,
   );
+});
+
+test("Members edit their own comments and moderators resolve comment reports independently", async () => {
+  const reporterToken=issue(await User.findById(c.user._id));
+  const created = await api("post", "/posts", a.token).send(payload);
+  const postId = created.body.post._id;
+  const added = await api("post", "/posts/"+postId+"/comments", a.token).send({content:"Bản đầu"});
+  const url="/comments/"+added.body.comment._id;
+  assert.equal((await api("patch",url,reporterToken).send({content:"Sửa hộ"})).status,403);
+  assert.equal((await api("patch",url,a.token).send({content:"Đã sửa"})).body.content,"Đã sửa");
+  assert.equal((await api("post",url+"/reports",a.token).send({reason:"spam"})).status,400);
+  assert.equal((await api("post",url+"/reports",reporterToken).send({reason:"spam"})).status,201);
+  assert.equal((await api("post",url+"/reports",reporterToken).send({reason:"spam"})).status,409);
+  const list=await api("get","/admin/reports?target=comment",owner.token);
+  const report=list.body.data.find(item=>item.comment===added.body.comment._id);
+  assert.equal(report.originalContent,"Đã sửa");
+  assert.equal((await api("patch","/admin/comment-reports/"+report._id,owner.token).send({action:"remove"})).status,200);
+  assert.equal((await api("get","/posts/"+postId)).status,200);
+  assert.equal((await api("get","/posts/"+postId+"/comments")).body.data.length,0);
 });

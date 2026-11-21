@@ -7,6 +7,7 @@ import { ZodError } from "zod";
 import { auth } from "./core.js";
 import { accounts } from "./accounts.js";
 import { posts } from "./posts.js";
+import { drafts } from "./drafts.js";
 import { management } from "./admin.js";
 export function createApp() {
   const app = express();
@@ -45,6 +46,7 @@ export function createApp() {
     }),
     auth,
     accounts,
+    drafts,
     posts,
     management,
   );
@@ -77,6 +79,9 @@ export function createApp() {
           ? "Ảnh tối đa 5 MB/tệp, tối đa 6 tệp"
           : err.message;
     }
+    const field = err.field || (err.name === "MulterError" &&
+      ["LIMIT_FILE_SIZE", "LIMIT_FILE_COUNT"].includes(err.code) ? "images" : undefined);
+    if (status === 400 && field && !fields) fields = [{ field, message }];
     if (status >= 500) {
       console.error("Request failed:", err.name, err.code || "");
       message = "Lỗi máy chủ. Vui lòng thử lại.";

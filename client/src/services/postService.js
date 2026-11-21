@@ -22,28 +22,26 @@ export const postService = {
     return res.data;
   },
 
+  setStatus: (id,status) => api.patch('/admin/posts/'+id+'/status',{status}),
+  appeal: (id,reason,cycle) => api.post('/posts/'+id+'/appeal',{reason,cycle}),
+
   deletePost: async (id) => {
     const res = await api.delete(`/posts/${id}`);
     return res.data;
   },
 
   autocompletePlaces: async (q) => {
-    const res = await api.get('/places/autocomplete', { params: { q } });
-    return res.data;
-  },
-
-  getPlaceDetail: async (placeId) => {
-    const res = await api.get(`/places/${placeId}`);
-    return res.data;
+    const res=await api.get('/posts',{params:{q,limit:20}});
+    return [...new Map(res.data.data.map(p=>[p.location.name,p.location])).values()];
   },
 
   likePost: async (id) => {
-    const res = await api.post(`/posts/${id}/likes`);
+    const res = await api.put(`/posts/${id}/like`);
     return res.data;
   },
 
   unlikePost: async (id) => {
-    const res = await api.delete(`/posts/${id}/likes`);
+    const res = await api.delete(`/posts/${id}/like`);
     return res.data;
   },
 
@@ -65,7 +63,8 @@ export const postService = {
   },
 
   reportPost: async (payload) => {
-    const res = await api.post('/reports', payload);
+    const {postId,...body}=payload;
+    const res = await api.post(`/posts/${postId}/reports`, body);
     return res.data;
   },
 };
