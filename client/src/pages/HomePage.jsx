@@ -1,6 +1,6 @@
 import CommentAvatar from '../journal/CommentAvatar.jsx';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
-import {Link,Navigate,useSearchParams} from 'react-router-dom';
+import {Link,NavLink,Navigate,Outlet,useLocation,useOutletContext,useSearchParams} from 'react-router-dom';
 import {configureStore,createSlice} from '@reduxjs/toolkit';
 import {Provider,useDispatch,useSelector} from 'react-redux';
 import {Search,Compass,Bell,Plus,User,Bookmark,Shield,Calendar,ArrowRight} from 'lucide-react';
@@ -18,8 +18,11 @@ function OnePost({id,card,revision}){
  const result=useResult('/posts/'+encodeURIComponent(id),revision);
  return result.data?card(result.data.post):<p>{result.error||'Đang tải…'}</p>;
 }
-function Journal({user,logout,children}){
- const [params,setParams]=useSearchParams(), view=children?'route':params.get('view')||'explore',id=params.get('id'),q=params.get('q')||'';
+function Journal({user,logout}){
+ const {pathname}=useLocation();
+ const [params]=useSearchParams();
+ const view=pathname==='/' ? params.get('view') || 'explore' : 'route';
+ const q=params.get('q') || '';
  const [revision,setRevision]=useState(0),[alertsChanged,setAlertsChanged]=useState(false);
  const refresh=useCallback(()=>setRevision(n=>n+1),[]);
  const [queues,setQueues]=useState(null);
@@ -57,7 +60,16 @@ function Journal({user,logout,children}){
  function changeTheme(value){setDark(value);try{localStorage.setItem('wanderly-theme',value?'dark':'light');}catch{}}
  const protectedLink=v=>user?'/?view='+v:'/login';
  const avatar=<CommentAvatar className="avatar" author={user || {displayName: "Khách"}}/>;
- const nav=(path,label,Icon,href,count=0)=> <Link aria-label={count?label+' ('+count+')':label} className={view===path?'active':''} to={href}><i className="menu-icon"><Icon/>{count>0&&<b className="menu-count" aria-hidden="true">{count>99?'99+':count}</b>}</i><span>{label}</span></Link>;
+ function nav(path,label,Icon,href,count=0) {
+   const selected = view === path || (path === 'profile' && pathname === '/account') ||
+     (path === 'notifications' && pathname === '/notifications');
+   const content = <><i className="menu-icon"><Icon/>{count>0&&<b className="menu-count" aria-hidden="true">{count>99?'99+':count}</b>}</i><span>{label}</span></>;
+   const name = count ? label+' ('+count+')' : label;
+   // The journal tabs share a pathname and select their content through ?view=.
+   const target = selected && pathname !== '/' ? pathname : href;
+   return <NavLink end to={target} aria-label={name} aria-current={selected ? 'page' : false}
+     className={({isActive}) => isActive && selected ? 'active' : ''}>{content}</NavLink>;
+ }
 
  function theme(){return <button role="switch" type="button" aria-label="Chế độ tối" aria-checked={dark} className="mode-switch"
  onPointerDown={e=>{e.currentTarget.dataset.start=e.clientX;e.currentTarget.setPointerCapture(e.pointerId);}}
@@ -72,7 +84,14 @@ function Journal({user,logout,children}){
  <WanderlySearch key={view+q} query={q} account={user?._id}/>
  <details ref={accountMenu} className="account-menu"><summary aria-label="Tài khoản">{avatar}</summary><div>{theme()}{member&&<><Link to={profileUrl(user._id)}>Trang cá nhân</Link><Link to='/settings/password'>Đổi mật khẩu</Link></>}{user?<Action run={logout}>Đăng xuất</Action>:<Link to="/login">Đăng nhập</Link>}</div></details>
  {!user?<div className="guest-auth-links"><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link></div>:<Link className="primary" aria-label="Đăng bài" to={protectedLink('create')}><Plus/> Đăng bài</Link>}</div></header>
- <main id="main"><div className="layout"><section className="timeline">{children}
+ <main id="main"><div className="layout"><section className="timeline"><Outlet context={{user,member,view,q,revision,refresh,card,protectedLink,queues,alertsChanged,setAlertsChanged}}/>
+ </section><aside className="right-column"><div className="side-account">{avatar}<div><strong>{user?.displayName||'Khách ghé thăm'}</strong><small>Hôm nay bạn muốn đi đâu?</small></div></div><section className="side-panel"><div className="aside-title"><h3>Điểm đến được yêu thích</h3><Compass/></div>{['Hà Giang','Hội An','Ninh Bình'].map((n,i)=><Link className="place" key={n} to={'/?q='+encodeURIComponent(n)}><img src={['https://media.mia.vn/uploads/blog-du-lich/hanh-trinh-lang-thang-ha-giang-bang-xe-may-day-thu-vi-15-1668444071.jpg','/wanderly-1.0/hoian.webp','https://sodulich.ninhbinh.gov.vn/uploads/images/trang_an1.jpg'][i]} alt=""/><span><strong>{n}</strong><small>{['Những mùa mây ngang núi','Một chút bình yên phố cổ','Lạc giữa miền xanh'][i]}</small></span><ArrowRight/></Link>)}</section><section className="journal-note"><span>GÓC NHẬT KÝ</span><h3>Đi để thấy.<br/>Viết để nhớ.</h3><p>Những điều nhỏ bé hôm nay,<br/>là kỷ niệm đẹp của ngày mai.</p><Link to={protectedLink("create")}>Kể câu chuyện của bạn <ArrowRight/></Link></section></aside></div></main><footer>Wanderly · Đi để trải nghiệm, viết để nhớ.</footer></div></div>;
+}
+export function JournalTimeline() {
+ const {user,member,view,q,revision,refresh,card,protectedLink,queues,alertsChanged,setAlertsChanged}=useOutletContext();
+ const [params,setParams]=useSearchParams();
+ const id=params.get('id');
+ return <>
  {['explore','following','create'].includes(view)&&<><div className="feed-tabs"><Link className={view==='explore'?'selected':''} to="/">Dành cho bạn</Link><Link className={view==='following'?'selected':''} to={protectedLink('following')}>Đang theo dõi</Link><span><Compass/></span></div>
  <div className="destination-strip"><Link className="destination add-diary" to={protectedLink('create')}><span><Plus/></span><small>Nhật ký mới</small></Link><div className="journey-heading"><span className="journey-heading-kicker">WANDERLY · NHẬT KÝ DU LỊCH</span><h2>Mỗi chuyến đi, một câu chuyện</h2><p>Lưu giữ những khoảnh khắc đẹp và chia sẻ hành trình của riêng bạn.</p></div></div>
  <div className="feed-head"><h2>{q?'Kết quả cho “'+q+'”':'Những chuyến đi đáng nhớ'}</h2></div><div className="chips">{['','Hà Giang','Hội An','Ninh Bình'].map(n=><button key={n} className={'chip '+(q===n?'active':'')} onClick={()=>setParams({...view==='following'?{view}:{},...n?{q:n}:{}})}>{n||'Tất cả'}</button>)}</div>
@@ -85,11 +104,12 @@ function Journal({user,logout,children}){
  {view==='notifications'&&user&&<>{alertsChanged&&<button onClick={()=>{setAlertsChanged(false);refresh();}}>Cập nhật danh sách thông báo</button>}<Notifications revision={revision} refresh={refresh}/></>}
  {((!user&&['saved','notifications','admin'].includes(view))||(user&&view==='admin'&&user.role!=='admin'))&&<p>Bạn cần tài khoản phù hợp để xem trang này. <Link to="/login">Đăng nhập</Link></p>}
  {view==='admin'&&user?.role==='admin'&&<Admin queues={queues} user={user} refresh={refresh} revision={revision}/>}
- </section><aside className="right-column"><div className="side-account">{avatar}<div><strong>{user?.displayName||'Khách ghé thăm'}</strong><small>Hôm nay bạn muốn đi đâu?</small></div></div><section className="side-panel"><div className="aside-title"><h3>Điểm đến được yêu thích</h3><Compass/></div>{['Hà Giang','Hội An','Ninh Bình'].map((n,i)=><Link className="place" key={n} to={'/?q='+encodeURIComponent(n)}><img src={['https://media.mia.vn/uploads/blog-du-lich/hanh-trinh-lang-thang-ha-giang-bang-xe-may-day-thu-vi-15-1668444071.jpg','/wanderly-1.0/hoian.webp','https://sodulich.ninhbinh.gov.vn/uploads/images/trang_an1.jpg'][i]} alt=""/><span><strong>{n}</strong><small>{['Những mùa mây ngang núi','Một chút bình yên phố cổ','Lạc giữa miền xanh'][i]}</small></span><ArrowRight/></Link>)}</section><section className="journal-note"><span>GÓC NHẬT KÝ</span><h3>Đi để thấy.<br/>Viết để nhớ.</h3><p>Những điều nhỏ bé hôm nay,<br/>là kỷ niệm đẹp của ngày mai.</p><Link to={protectedLink("create")}>Kể câu chuyện của bạn <ArrowRight/></Link></section></aside></div></main><footer>Wanderly · Đi để trải nghiệm, viết để nhớ.</footer></div></div>;
+ </>;
 }
-export default function HomePage({children}){
+
+export default function HomePage(){
  const {user,loading,logout}=useAuth();
  const store=useMemo(()=>configureStore({reducer:alerts.reducer}),[user?._id]);
  if(loading)return <p>Đang kiểm tra phiên…</p>;
- return <Provider store={store}><Journal key={user?._id||'guest'} user={user} logout={logout}>{children}</Journal></Provider>;
+ return <Provider store={store}><Journal key={user?._id||'guest'} user={user} logout={logout}/></Provider>;
 }
