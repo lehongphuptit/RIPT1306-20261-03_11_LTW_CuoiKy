@@ -1,0 +1,39 @@
+.wv2 .notice-panel { color: var(--ink); }
+.wv2 .notice-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.wv2 .notice-heading h1, .wv2 .notice-body p { margin: 0; }
+.wv2 .notice-all, .wv2 .notice-actions a, .wv2 .notice-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 14px;
+  color: var(--green);
+}
+.wv2 .notice-all { padding: 0 12px; border-radius: 10px; background: var(--soft); }
+.wv2 .notice-item {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.wv2 .notice-icon {
+  display: grid;
+  place-items: center;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--soft);
+}
+.wv2 .notice-item[data-unread="true"] .notice-icon { background: var(--green); color: var(--paper); }
+.wv2 .notice-body { padding-top: 5px; overflow-wrap: anywhere; }
+.wv2 .notice-body p a { font-weight: 650; }
+.wv2 .notice-actions { display: flex; flex-wrap: wrap; gap: 0 16px; }

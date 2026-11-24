@@ -1,3 +1,5 @@
+import './notifications.css';
+import {ArrowRight, Bell, CheckCheck} from 'lucide-react';
 import './adminSections.css';
 import {confirmAction, notify} from './Feedback.jsx';
 import {useState} from 'react';
@@ -5,24 +7,51 @@ import {Link} from 'react-router-dom';
 import {api,errorMessage} from '../services/api.js';
 import {Action,List,useResult,profileUrl} from './common.jsx';
 
+import {useAuth} from '../context/AuthContext.jsx';
+
 export function Profile({id,user,refresh,revision}){
+ const {setUser}=useAuth();
  const {data,error}=useResult('/users/'+id,revision);
  const [edit,setEdit]=useState(false),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  if(!data)return <p>{error||'Đang tải hồ sơ…'}</p>;
  const p=data.user,own=id===user?._id;
  async function save(e){e.preventDefault();const body=new FormData(e.currentTarget);if(!body.get('avatar')?.size)body.delete('avatar');
- setBusy(true);try{await api.patch('/users/me',body);setEdit(false);refresh();}catch(err){setMessage(errorMessage(err));}finally{setBusy(false);}}
+ setBusy(true);try{const {data}=await api.patch('/users/me',body);setUser(current=>current?._id===data.user._id?{...current,...data.user}:current);setEdit(false);refresh();}catch(err){setMessage(errorMessage(err));}finally{setBusy(false);}}
  return <><section className="profile-info"><div className="avatar">{!p.avatar?.url&&p.displayName?.slice(0,1)}{p.avatar?.url&&<img className="portrait" src={p.avatar.url} alt="Ảnh đại diện"/>}</div><div>
  <h1>{p.displayName}</h1><span>@{p.username}</span><p>{p.bio}</p><p>{data.posts} bài · {data.followers} người theo dõi · {data.following} đang theo dõi</p>
  </div>{own?<button onClick={()=>setEdit(!edit)}>Chỉnh sửa hồ sơ</button>:user?.role==='member'&&<Action run={async()=>{const path='/users/'+id+'/follow';if(data.isFollowing)await api.delete(path);else await api.put(path);refresh();}}>{data.isFollowing?'Bỏ theo dõi':'Theo dõi'}</Action>}
  {edit&&<form onSubmit={save}><label>Tên hiển thị<input name="displayName" defaultValue={p.displayName} required maxLength={80}/></label><label>Giới thiệu<textarea name="bio" defaultValue={p.bio} maxLength={200}/></label><label>Ảnh đại diện<input type="file" name="avatar" accept="image/jpeg,image/png,image/webp"/></label><button disabled={busy}>Lưu hồ sơ</button>{message&&<p>{message}</p>}</form>}</section><div className="feed-head"><h2>Nhật ký hành trình</h2></div></>;
 }
-export function Notifications({revision,refresh}){
- return <><h1>Thông báo</h1><Action run={async()=>{await api.patch('/notifications/read-all');refresh();}}>Đánh dấu tất cả đã đọc</Action>
- <List url="/notifications" revision={revision} empty="Chưa có thông báo." render={n=><article key={n._id} className="journal-card">
- {n.message?<p>{n.message}</p>:<><Link to={profileUrl(n.actor?._id)}>{n.actor?.displayName||'Thành viên'}</Link> {{like:'đã thích bài viết',follow:'đã theo dõi bạn',comment:'đã bình luận'}[n.type]||n.type}</>}
- {n.post&&n.type!=='report_dismissed'&&<Link to={'/posts/'+n.post}>{n.type==='post_hidden'?'Xem bài và khiếu nại':'Xem bài'}</Link>}
- {!n.read&&<Action run={async()=>{await api.patch('/notifications/'+n._id+'/read');refresh();}}>Đánh dấu đã đọc</Action>}</article>}/></>;
+export function Notifications({revision, refresh}) {
+  async function markRead(path) {
+    await api.patch(path);
+    refresh();
+  }
+
+  const descriptions = {like: 'đã thích bài viết', follow: 'đã theo dõi bạn', comment: 'đã bình luận'};
+  return <section className="notice-panel" aria-labelledby="notice-title">
+    <div className="notice-heading">
+      <h1 id="notice-title">Thông báo</h1>
+      <Action className="notice-all" run={() => markRead('/notifications/read-all')}>
+        <CheckCheck size={17} aria-hidden="true"/> Đánh dấu tất cả đã đọc
+      </Action>
+    </div>
+    <List url="/notifications" revision={revision} empty="Chưa có thông báo." render={n => {
+      const actor = n.actor?.displayName || 'Thành viên';
+      return <article key={n._id} className="notice-item" data-unread={!n.read}>
+        <span className="notice-icon" aria-hidden="true"><Bell size={18}/></span>
+        <div className="notice-body">
+          <p>{n.message || <>{n.actor?._id ? <Link to={profileUrl(n.actor._id)}>{actor}</Link> : <strong>{actor}</strong>} {descriptions[n.type] || n.type}</>}</p>
+          <div className="notice-actions">
+            {n.post && n.type !== 'report_dismissed' && <Link to={'/posts/' + n.post}>
+              {n.type === 'post_hidden' ? 'Xem bài và khiếu nại' : 'Xem bài'} <ArrowRight size={14} aria-hidden="true"/>
+            </Link>}
+            {!n.read && <Action run={() => markRead('/notifications/' + n._id + '/read')}>Đánh dấu đã đọc</Action>}
+          </div>
+        </div>
+      </article>;
+    }}/>
+  </section>;
 }
 export function Admin({user,revision,refresh,queues}){
  const [status,setStatus]=useState("pending");

@@ -1,3 +1,4 @@
+import CommentAvatar from './CommentAvatar.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -101,7 +102,7 @@ export default function WanderlySearch({ query, account }) {
         {suggestions?.users?.map(user => <button className="wanderly-search-suggestion" key={user._id} onClick={() => {
           updateHistory(['@' + user.username, ...history.filter(v => v !== '@' + user.username)].slice(0, 7));
           close(); navigate(profileUrl(user._id));
-        }}><span className="avatar">{user.displayName?.slice(0, 1)}</span><span><strong>{user.displayName}</strong><small>@{user.username}</small></span></button>)}
+        }}><CommentAvatar className="avatar" author={user}/><span><strong>{user.displayName}</strong><small>@{user.username}</small></span></button>)}
         {places.map(place => suggestion(place, MapPin))}
         {suggestions?.tags?.map(tag => suggestion('#' + tag, Search))}
         <p className="wanderly-search-empty" role="status">{!suggestions ? 'Đang tìm gợi ý…' : suggestions.failed ? 'Chưa tải được gợi ý. Nhấn Enter để tìm kiếm.' : 'Nhấn Enter để xem kết quả tìm kiếm.'}</p>
