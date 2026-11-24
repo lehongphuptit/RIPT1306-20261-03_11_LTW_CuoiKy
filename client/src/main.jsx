@@ -1,3 +1,4 @@
+import { ThemeProvider } from './context/ThemeContext.jsx';
 import Feedback from './journal/Feedback.jsx';
 
 import React from "react";
@@ -7,7 +8,9 @@ import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <Feedback />
-    <App />
+    <ThemeProvider>
+      <Feedback />
+      <App />
+    </ThemeProvider>
   </React.StrictMode>
 );
