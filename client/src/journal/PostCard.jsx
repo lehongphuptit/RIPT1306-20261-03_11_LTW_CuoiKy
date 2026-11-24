@@ -5,7 +5,7 @@ import CommentOptions from './CommentOptions.jsx';
 import GuestPostActions, {GuestPrompt} from './GuestPostActions.jsx';
 import PostOptions from './PostOptions.jsx';
 import JournalDialog from './JournalDialog.jsx';
-import {useState} from 'react';
+import {useRef,useState} from 'react';
 import {Link} from 'react-router-dom';
 import {Heart,Send,MessageCircle,Calendar,Wallet} from 'lucide-react';
 import {api,errorMessage} from '../services/api.js';
@@ -37,13 +37,31 @@ export default function PostCard({post,user,refresh,onRemoved}){
  const [liked,setLiked]=useState(post.liked),[likes,setLikes]=useState(post.likeCount);
  const [comments,setComments]=useState(false),[count,setCount]=useState(post.commentCount);
  const [report,setReport]=useState(false),[reason,setReason]=useState('spam'),[note,setNote]=useState(''),[reported,setReported]=useState(false);
+ const likePending = useRef(false);
+ async function toggleLike() {
+   if (likePending.current) return;
+   likePending.current = true;
+   const nextLiked = !liked;
+   setLiked(nextLiked);
+   setLikes(Math.max(0, likes + (nextLiked ? 1 : -1)));
+   try {
+     if (nextLiked) await api.put(url + '/like');
+     else await api.delete(url + '/like');
+   } catch (error) {
+     setLiked(liked);
+     setLikes(likes);
+     throw error;
+   } finally {
+     likePending.current = false;
+   }
+ }
  const member=user?.role==='member',own=member&&user._id===post.author?._id,url='/posts/'+post._id;
- return <article className="post"><div className="post-head"><span className="avatar">{post.author?.displayName?.split(/\s+/).slice(0,2).map(n=>n[0]).join('')}</span><div className="byline"><div className="post-author-row"><Link to={profileUrl(post.author?._id)}>{post.author?.displayName}</Link>
+ return <article className="post"><div className="post-head"><CommentAvatar className="avatar" author={post.author}/><div className="byline"><div className="post-author-row"><Link to={profileUrl(post.author?._id)}>{post.author?.displayName}</Link>
  {!user&&<PostOptions id={post._id} onGuestSave={()=>setGuestSave(true)}/>}
  {member&&<PostOptions id={post._id} saved={saved} onSaved={value=>{setSaved(value);if(!value)onRemoved?.();}} onReport={own?undefined:()=>setReport(true)} reported={reported} onEdit={own?()=>setEditing(true):undefined} onDelete={own?async()=>{if(await confirmAction("Xóa vĩnh viễn nhật ký này?", 'Xóa bài')){await api.delete(url);notify("Đã xóa bài viết.");refresh();}}:undefined}/>}</div><small>@{post.author?.username} · {post.visibility==='private'?'Riêng tư':post.visibility==='followers'?'Chỉ người theo dõi':'Công khai'}</small></div></div>
  {post.images?.map(i=><div className="image-wrap" key={i.publicId||i.url}><Link to={url}><JournalImage className="post-cover" src={i.url} loading="lazy" alt={post.title}/></Link><span className="location-tag">{post.location?.name}</span></div>)}
  <div className="post-body">{own&&post.status==='hidden'&&<Link to={url}>Bài viết đang bị ẩn · Xem quyết định</Link>}<h3><Link to={url}>{post.title}</Link></h3><p className="content"><TaggedText text={post.content}/></p><div className="post-meta"><span><Calendar/>{new Date(post.tripDate).toLocaleDateString('vi-VN',{timeZone:'UTC'})}</span><span><Wallet/>{Number(post.cost).toLocaleString('vi-VN')} ₫</span><span>{post.location?.name}</span></div></div>
- <div className="post-actions">{!user?<GuestPostActions post={post} showMenu={false}/>:<>{member?<Action aria-pressed={liked} aria-label="Thích bài viết" run={async()=>{const r=liked?await api.delete(url+'/like'):await api.put(url+'/like');setLiked(r.data.liked);setLikes(v=>v+(r.data.liked?1:-1));}}><Heart size={18} fill={liked?'currentColor':'none'}/> {likes}</Action>:<span className="guest-like"><Heart/> {likes}</span>}
+ <div className="post-actions">{!user?<GuestPostActions post={post} showMenu={false}/>:<>{member?<Action aria-pressed={liked} aria-label="Thích bài viết" run={toggleLike}><Heart size={18} fill={liked?'currentColor':'none'}/> {likes}</Action>:<span className="guest-like"><Heart/> {likes}</span>}
  <button onClick={()=>setComments(!comments)} aria-label={'Bình luận ('+count+')'}><MessageCircle/> {count} bình luận</button>
  </>}</div>
  <div className="extras">{guestSave&&!user&&<GuestPrompt postId={post._id} action="lưu" onClose={()=>setGuestSave(false)}/>}

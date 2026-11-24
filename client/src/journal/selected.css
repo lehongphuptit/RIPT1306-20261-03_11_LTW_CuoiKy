@@ -210,3 +210,5 @@
 .wv2 .post-author-row > .post-options { flex:0 0 44px; height:1em; }
 .wv2 .post-author-row .post-options > button { position:absolute; right:0; top:50%; transform:translateY(-50%); }
 .wv2 .post-author-row .post-options-panel { top:calc(50% + 24px); bottom:auto; }
+
+.wv2 .avatar > img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; display: block; }

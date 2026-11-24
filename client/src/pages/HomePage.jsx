@@ -1,3 +1,4 @@
+import CommentAvatar from '../journal/CommentAvatar.jsx';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Link,Navigate,useSearchParams} from 'react-router-dom';
 import {configureStore,createSlice} from '@reduxjs/toolkit';
@@ -55,8 +56,7 @@ function Journal({user,logout,children}){
  function card(post){return <PostCard key={post._id} post={post} user={user} refresh={refresh} onRemoved={view==="saved"?refresh:undefined}/>;}
  function changeTheme(value){setDark(value);try{localStorage.setItem('wanderly-theme',value?'dark':'light');}catch{}}
  const protectedLink=v=>user?'/?view='+v:'/login';
- const initials=(user?.displayName||'Khách').split(/\s+/).slice(0,2).map(s=>s[0]).join('');
- const avatar=<span className="avatar">{initials}</span>;
+ const avatar=<CommentAvatar className="avatar" author={user || {displayName: "Khách"}}/>;
  const nav=(path,label,Icon,href,count=0)=> <Link aria-label={count?label+' ('+count+')':label} className={view===path?'active':''} to={href}><i className="menu-icon"><Icon/>{count>0&&<b className="menu-count" aria-hidden="true">{count>99?'99+':count}</b>}</i><span>{label}</span></Link>;
 
  function theme(){return <button role="switch" type="button" aria-label="Chế độ tối" aria-checked={dark} className="mode-switch"
