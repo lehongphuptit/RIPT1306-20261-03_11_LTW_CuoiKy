@@ -1,3 +1,4 @@
+import {useTheme} from '../context/ThemeContext.jsx';
 import CommentAvatar from '../journal/CommentAvatar.jsx';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Link,NavLink,Navigate,Outlet,useLocation,useOutletContext,useSearchParams} from 'react-router-dom';
@@ -27,7 +28,7 @@ function Journal({user,logout}){
  const refresh=useCallback(()=>setRevision(n=>n+1),[]);
  const [queues,setQueues]=useState(null);
  const unread=useSelector(s=>s.count),dispatch=useDispatch();
- const [dark,setDark]=useState(()=>localStorage.getItem('wanderly-theme')==='dark');
+ const {dark,changeTheme}=useTheme();
  const accountMenu = useRef(null);
  useEffect(()=>{
    function dismiss(event) {
@@ -57,7 +58,6 @@ function Journal({user,logout}){
  },[user,revision,dispatch]);
  useEffect(()=>{if(q.startsWith('#'))window.scrollTo(0,0);},[q]);
  function card(post){return <PostCard key={post._id} post={post} user={user} refresh={refresh} onRemoved={view==="saved"?refresh:undefined}/>;}
- function changeTheme(value){setDark(value);try{localStorage.setItem('wanderly-theme',value?'dark':'light');}catch{}}
  const protectedLink=v=>user?'/?view='+v:'/login';
  const avatar=<CommentAvatar className="avatar" author={user || {displayName: "Khách"}}/>;
  function nav(path,label,Icon,href,count=0) {
