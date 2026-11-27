@@ -1,7 +1,7 @@
 import CommentAvatar from './CommentAvatar.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { MapPin, Search } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { MapPin, Search, SlidersHorizontal } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../services/api.js';
 import { profileUrl } from './common.jsx';
 
@@ -10,6 +10,14 @@ const fold = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toL
 
 export default function WanderlySearch({ query, account }) {
   const navigate = useNavigate();
+  const [urlParams] = useSearchParams();
+  const [advanced, setAdvanced] = useState(false);
+  const [tags, setTags] = useState(() => (urlParams.get("tags") || "").split(",").filter(Boolean));
+  const [tagDraft, setTagDraft] = useState("");
+  const [tagMode, setTagMode] = useState(urlParams.get("tagMode") || "all");
+  const [minCost, setMinCost] = useState(urlParams.get("minCost") || "");
+  const [maxCost, setMaxCost] = useState(urlParams.get("maxCost") || "");
+  const [sort, setSort] = useState(urlParams.get("sort") || "newest");
   const root = useRef(null);
   const trigger = useRef(null);
   const input = useRef(null);
@@ -33,11 +41,24 @@ export default function WanderlySearch({ query, account }) {
     setHistory(items);
     try { localStorage.setItem(key, JSON.stringify(items)); } catch { /* Storage can be disabled. */ }
   }
+  function addTag(value) {
+    const tag = value.trim().replace(/^#/, '').toLowerCase();
+    if (/^[\p{L}\p{N}_]{1,60}$/u.test(tag)) setTags(current => current.includes(tag) ? current : [...current, tag].slice(0, 12));
+    setTagDraft('');
+  }
   function submit(value) {
     const text = value.trim();
     if (text) updateHistory([text, ...history.filter(item => item !== text)].slice(0, 7));
     close();
-    navigate(text ? '/?q=' + encodeURIComponent(text) : '/');
+    const next = new URLSearchParams();
+    if (text) next.set('q', text);
+    if (tags.length) next.set('tags', tags.join(','));
+    if (tags.length && tagMode === 'any') next.set('tagMode', 'any');
+    if (minCost !== '') next.set('minCost', minCost);
+    if (maxCost !== '') next.set('maxCost', maxCost);
+    if (sort !== 'newest') next.set('sort', sort);
+    navigate('/' + (next.size ? '?' + next.toString() : ''));
+
   }
   useEffect(() => {
     if (!open) return;
@@ -87,6 +108,17 @@ export default function WanderlySearch({ query, account }) {
           placeholder="Tìm người dùng, địa điểm, hashtag..." value={draft} onChange={event => setDraft(event.target.value)}/>
         <button className="wanderly-search-submit">Tìm kiếm</button>
       </form>
+      <button type="button" className="wanderly-advanced-toggle" onClick={() => setAdvanced(v => !v)} aria-expanded={advanced}><SlidersHorizontal/> Bộ lọc nâng cao <span>{advanced ? 'Thu gọn −' : 'Mở rộng +'}</span></button>
+      {advanced && <div className="wanderly-advanced-fields">
+        <label>Hashtag (có thể chọn nhiều)</label>
+        <div className="wanderly-tag-entry"><input value={tagDraft} placeholder="Nhập hashtag rồi nhấn Enter" onChange={e => setTagDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagDraft); } }}/><button type="button" onClick={() => addTag(tagDraft)}>Thêm</button></div>
+        <div className="wanderly-selected-tags">{tags.map(tag => <button type="button" key={tag} onClick={() => setTags(v => v.filter(t => t !== tag))}>#{tag} ×</button>)}</div>
+        <label>Điều kiện hashtag</label><select value={tagMode} onChange={e => setTagMode(e.target.value)}><option value="all">Chứa tất cả hashtag</option><option value="any">Chứa ít nhất một hashtag</option></select>
+        <label>Khoảng chi phí chuyến đi (VNĐ)</label><div className="wanderly-price-row"><input type="number" min="0" placeholder="Từ" value={minCost} onChange={e => setMinCost(e.target.value)}/><span>—</span><input type="number" min="0" placeholder="Đến" value={maxCost} onChange={e => setMaxCost(e.target.value)}/></div>
+        <div className="wanderly-price-presets">{[['Dưới 1 triệu','',1000000],['1–3 triệu',1000000,3000000],['3–5 triệu',3000000,5000000],['Trên 5 triệu',5000000,'']].map(([label,min,max]) => <button type="button" key={label} onClick={() => {setMinCost(String(min));setMaxCost(String(max));}}>{label}</button>)}</div>
+        <label>Sắp xếp theo</label><select value={sort} onChange={e => setSort(e.target.value)}><option value="newest">Mới nhất</option><option value="likes">Nhiều lượt thích nhất</option><option value="price_asc">Chi phí thấp đến cao</option><option value="price_desc">Chi phí cao đến thấp</option></select>
+        <div className="wanderly-advanced-actions"><button type="button" onClick={() => {setTags([]);setMinCost('');setMaxCost('');setSort('newest');setTagMode('all');}}>Xóa bộ lọc</button><button type="button" onClick={() => submit(term)}>Áp dụng bộ lọc</button></div>
+      </div>}
       {!term ? <>
         <div className="wanderly-search-section-head"><strong>Tìm kiếm gần đây</strong>
           {history.length > 0 && <button onClick={() => updateHistory([])}>Xóa tất cả</button>}</div>
@@ -104,7 +136,7 @@ export default function WanderlySearch({ query, account }) {
           close(); navigate(profileUrl(user._id));
         }}><CommentAvatar className="avatar" author={user}/><span><strong>{user.displayName}</strong><small>@{user.username}</small></span></button>)}
         {places.map(place => suggestion(place, MapPin))}
-        {suggestions?.tags?.map(tag => suggestion('#' + tag, Search))}
+        {suggestions?.tags?.map(tag => <div className="wanderly-search-tag-suggestion" key={tag}><button type="button" onClick={() => submit('#' + tag)}>#{tag}</button><button type="button" onClick={() => {addTag(tag);setAdvanced(true);}}>+ Lọc</button></div>)}
         <p className="wanderly-search-empty" role="status">{!suggestions ? 'Đang tìm gợi ý…' : suggestions.failed ? 'Chưa tải được gợi ý. Nhấn Enter để tìm kiếm.' : 'Nhấn Enter để xem kết quả tìm kiếm.'}</p>
       </>}
     </section>}

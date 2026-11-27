@@ -4,7 +4,7 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Link,NavLink,Navigate,Outlet,useLocation,useOutletContext,useSearchParams} from 'react-router-dom';
 import {configureStore,createSlice} from '@reduxjs/toolkit';
 import {Provider,useDispatch,useSelector} from 'react-redux';
-import {Search,Compass,Bell,Plus,User,Bookmark,Shield,Calendar,ArrowRight} from 'lucide-react';
+import {Search,Compass,Bell,Plus,User,Bookmark,Shield,Calendar,ArrowRight,Hash,MapPin,SlidersHorizontal} from 'lucide-react';
 import {useAuth} from '../context/AuthContext.jsx';
 import {api} from '../services/api.js';
 import {List,useResult,Action,profileUrl} from '../journal/common.jsx';
@@ -87,16 +87,45 @@ function Journal({user,logout}){
  <main id="main"><div className="layout"><section className="timeline"><Outlet context={{user,member,view,q,revision,refresh,card,protectedLink,queues,alertsChanged,setAlertsChanged}}/>
  </section><aside className="right-column"><div className="side-account">{avatar}<div><strong>{user?.displayName||'Khách ghé thăm'}</strong><small>Hôm nay bạn muốn đi đâu?</small></div></div><section className="side-panel"><div className="aside-title"><h3>Điểm đến được yêu thích</h3><Compass/></div>{['Hà Giang','Hội An','Ninh Bình'].map((n,i)=><Link className="place" key={n} to={'/?q='+encodeURIComponent(n)}><img src={['https://media.mia.vn/uploads/blog-du-lich/hanh-trinh-lang-thang-ha-giang-bang-xe-may-day-thu-vi-15-1668444071.jpg','/wanderly-1.0/hoian.webp','https://sodulich.ninhbinh.gov.vn/uploads/images/trang_an1.jpg'][i]} alt=""/><span><strong>{n}</strong><small>{['Những mùa mây ngang núi','Một chút bình yên phố cổ','Lạc giữa miền xanh'][i]}</small></span><ArrowRight/></Link>)}</section><section className="journal-note"><span>GÓC NHẬT KÝ</span><h3>Đi để thấy.<br/>Viết để nhớ.</h3><p>Những điều nhỏ bé hôm nay,<br/>là kỷ niệm đẹp của ngày mai.</p><Link to={protectedLink("create")}>Kể câu chuyện của bạn <ArrowRight/></Link></section></aside></div></main><footer>Wanderly · Đi để trải nghiệm, viết để nhớ.</footer></div></div>;
 }
+function SearchUserCard({person}) {
+ return <Link className="wanderly-person-card" to={profileUrl(person._id)}>
+  <CommentAvatar className="avatar" author={person}/>
+  <span className="wanderly-person-details"><strong>{person.displayName || person.username}</strong><small>@{person.username}</small><em>Xem hồ sơ và những nhật ký công khai</em></span>
+  <span className="wanderly-person-action">Xem hồ sơ <ArrowRight size={16}/></span>
+ </Link>;
+}
+function SearchEmpty({kind,clearSearch}) {
+ return <section className="wanderly-search-empty"><div className="wanderly-empty-icon">{kind==='users'?<User/>:<Search/>}</div><h2>Chưa tìm thấy {kind==='users'?'tài khoản':'bài viết'} phù hợp</h2><p>Thử từ khóa khác hoặc bỏ bớt hashtag, khoảng chi phí và điều kiện sắp xếp.</p><button onClick={clearSearch}>Xóa bộ lọc <ArrowRight size={16}/></button></section>;
+}
 export function JournalTimeline() {
  const {user,member,view,q,revision,refresh,card,protectedLink,queues,alertsChanged,setAlertsChanged}=useOutletContext();
  const [params,setParams]=useSearchParams();
  const id=params.get('id');
+ const filters = new URLSearchParams();
+ for (const key of ['q','tags','tagMode','minCost','maxCost','sort']) if (params.get(key)) filters.set(key, params.get(key));
+ const searching = [...filters.keys()].length > 0;
+ const clearSearch = () => setParams({});
+ const tags = (params.get('tags') || '').split(',').filter(Boolean);
+ const priceLabel = value => Number(value).toLocaleString('vi-VN') + ' ₫';
+ const userSearch = q.trim().startsWith('@');
+ const userTerm = q.trim().slice(1);
+ const postFilters = new URLSearchParams(filters);
+ if (userSearch) postFilters.delete('q');
  return <>
- {['explore','following','create'].includes(view)&&<><div className="feed-tabs"><Link className={view==='explore'?'selected':''} to="/">Dành cho bạn</Link><Link className={view==='following'?'selected':''} to={protectedLink('following')}>Đang theo dõi</Link><span><Compass/></span></div>
+ {['explore','following','create'].includes(view)&&<>{!searching && <><div className="feed-tabs"><Link className={view==='explore'?'selected':''} to="/">Dành cho bạn</Link><Link className={view==='following'?'selected':''} to={protectedLink('following')}>Đang theo dõi</Link><span><Compass/></span></div>
  <div className="destination-strip"><Link className="destination add-diary" to={protectedLink('create')}><span><Plus/></span><small>Nhật ký mới</small></Link><div className="journey-heading"><span className="journey-heading-kicker">WANDERLY · NHẬT KÝ DU LỊCH</span><h2>Mỗi chuyến đi, một câu chuyện</h2><p>Lưu giữ những khoảnh khắc đẹp và chia sẻ hành trình của riêng bạn.</p></div></div>
- <div className="feed-head"><h2>{q?'Kết quả cho “'+q+'”':'Những chuyến đi đáng nhớ'}</h2></div><div className="chips">{['','Hà Giang','Hội An','Ninh Bình'].map(n=><button key={n} className={'chip '+(q===n?'active':'')} onClick={()=>setParams({...view==='following'?{view}:{},...n?{q:n}:{}})}>{n||'Tất cả'}</button>)}</div>
- {q.startsWith('@')?(q.length>1?<List url={'/users?q='+encodeURIComponent(q.slice(1))} render={p=><p key={p._id}><Link to={profileUrl(p._id)}>{p.displayName} · @{p.username}</Link></p>}/>:<p>Nhập ID sau dấu @.</p>):
- view==='following'&&!member?<Link to="/login">Đăng nhập để xem bảng tin.</Link>:<List auto url={(view==='following'?'/feed':'/posts')+'?q='+encodeURIComponent(q)} revision={revision} render={card} empty="Chưa có nhật ký để hiển thị."/>}</>}
+ </>}
+ {searching ? <>
+  <section className="wanderly-results-heading">
+   <div className="wanderly-results-eyebrow">KHÁM PHÁ · TÌM KIẾM</div>
+   <div className="wanderly-result-title-row"><div><h1>{userSearch?'Tìm kiếm người dùng':'Kết quả tìm kiếm'}</h1><p>{q ? <>Kết quả cho <strong>“{q}”</strong></> : 'Khám phá những chuyến đi phù hợp với bộ lọc của bạn'}</p></div><span className="wanderly-result-mark">{userSearch?<User/>:<SlidersHorizontal/>}</span></div>
+   <div className="wanderly-result-tabs"><span className="active">{userSearch?'Tài khoản':'Bài viết'}</span><span>{userSearch?'Hồ sơ Wanderly':'Nhật ký du lịch'}</span></div>
+   <div className="wanderly-active-filters">{tags.map(t => <span key={t}>#{t}</span>)}{params.get('minCost') && <span>Từ {priceLabel(params.get('minCost'))}</span>}{params.get('maxCost') && <span>Đến {priceLabel(params.get('maxCost'))}</span>}{params.get('sort') && <span>{({likes:'Nhiều lượt thích',price_asc:'Giá tăng dần',price_desc:'Giá giảm dần'})[params.get('sort')] || 'Mới nhất'}</span>}<button onClick={clearSearch}>Xóa tìm kiếm ×</button></div>
+  </section>
+  {userSearch ? <section className="wanderly-search-results"><div className="wanderly-result-section-label"><User size={18}/> <h2>Tài khoản phù hợp</h2></div>{userTerm ? <List url={'/users?q='+encodeURIComponent(userTerm)} render={person=><SearchUserCard key={person._id} person={person}/>} empty={<SearchEmpty kind="users" clearSearch={clearSearch}/>} /> : <SearchEmpty kind="users" clearSearch={clearSearch}/>}</section> :
+   <section className="wanderly-search-results"><div className="wanderly-result-section-label">{q.startsWith('#')?<Hash size={18}/>:<MapPin size={18}/>}<h2>{q.startsWith('#')?'Nhật ký theo hashtag':'Nhật ký phù hợp'}</h2></div><List auto url={(view==='following'?'/feed':'/posts')+'?'+filters.toString()} revision={revision} render={card} empty={<SearchEmpty kind="posts" clearSearch={clearSearch}/>} /></section>}
+ </> : <><div className="feed-head"><h2>Những chuyến đi đáng nhớ</h2></div><div className="chips">{['','Hà Giang','Hội An','Ninh Bình'].map(n=><button key={n} className={'chip '+(q===n?'active':'')} onClick={()=>setParams({...view==='following'?{view}:{},...n?{q:n}:{}})}>{n||'Tất cả'}</button>)}</div>{view==='following'&&!member?<Link to="/login">Đăng nhập để xem bảng tin.</Link>:<List auto url={(view==='following'?'/feed':'/posts')+'?'+filters.toString()} revision={revision} render={card} empty="Chưa có nhật ký để hiển thị."/>}</>}
+ </>}
  {view==='create'&&(member?<Composer user={user} initiallyOpen onCancel={()=>setParams({})} onPosted={()=>{refresh();setParams({});}}/>:<Link to="/login">Đăng nhập để đăng bài.</Link>)}
  {view==='post'&&id&&<OnePost id={id} card={card} revision={revision}/>}
  {view==='profile'&&id&&<><Profile id={id} user={user} refresh={refresh} revision={revision}/><List auto url={'/posts?author='+encodeURIComponent(id)} render={card} revision={revision}/></>}
